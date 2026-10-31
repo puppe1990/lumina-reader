@@ -1,0 +1,25 @@
+{{ define "content" }}
+<div class="flex min-h-[70vh] items-center justify-center px-5 py-10">
+  <div class="w-full max-w-sm">
+    <div class="mb-6 flex flex-col items-center gap-2 text-center">
+      <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary" aria-hidden="true">
+        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 6.6C10.5 5.4 8.6 4.9 6.4 5c-.9 0-1.7.1-2.4.3v13c.7-.2 1.5-.3 2.4-.3 2.2 0 4.1.5 5.6 1.7 1.5-1.2 3.4-1.7 5.6-1.7.9 0 1.7.1 2.4.3V5.3c-.7-.2-1.5-.3-2.4-.3-2.2-.1-4.1.4-5.6 1.6Z" />
+          <path d="M12 6.6v13.1" />
+        </svg>
+      </span>
+      <h1 class="font-serif text-2xl font-semibold text-on-surface">Lumina</h1>
+      <p class="text-[13px] text-secondary">Sua biblioteca pessoal — entre para continuar lendo.</p>
+    </div>
+    <div class="rounded-2xl bg-surface-container-low p-6 shadow-sm">
+      <h2 class="mb-4 font-serif text-[17px] font-semibold text-on-surface">{{ t "auth.login_title" }}</h2>
+      <.form action="/login" method="post">
+        <.input name="email" type="email" label="Email" value="{{ .Email }}" error="{{ fieldError .Errors "email" }}" />
+        <.password name="password" label="{{ t "auth.password_label" }}" error="{{ fieldError .Errors "password" }}" autocomplete="current-password" required="required" />
+        <.button type="submit">{{ t "auth.login_submit" }}</.button>
+      </.form>
+    </div>
+    <p class="mt-4 text-center text-[11px] text-secondary">O acervo inteiro mora no seu Backblaze B2 — só você lê daqui.</p>
+  </div>
+</div>
+{{ end }}

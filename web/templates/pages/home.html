@@ -1,0 +1,155 @@
+{{ define "content" }}
+<div class="mx-auto w-full max-w-5xl px-5 py-6">
+  {{ if eq .Totals.Total 0 }}
+  <section class="flex flex-col items-center justify-center gap-4 px-4 py-24 text-center">
+    <span class="material-symbols-outlined text-[56px] text-primary/70">shelves</span>
+    <h1 class="font-serif text-2xl font-semibold text-on-surface">Sua estante está vazia</h1>
+    <p class="max-w-sm text-sm leading-6 text-secondary">
+      Sincronize o acervo do Backblaze para trazer os livros para cá — depois de sincronizar, abrir um EPUB baixa e prepara os capítulos sozinho.
+    </p>
+    {{ if .SyncEnabled }}
+    <.form action="/sincronizar" method="post" class="contents">
+      <button type="submit" class="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-on-primary shadow-sm transition-colors hover:bg-primary-container">
+        <span class="material-symbols-outlined text-[18px]">sync</span>
+        <span class="text-sm font-medium">Sincronizar estante</span>
+      </button>
+    </.form>
+    {{ else }}
+    <p class="text-xs text-secondary">Configure B2_APPLICATION_KEY_ID, B2_APPLICATION_KEY e B2_BUCKET no ambiente para sincronizar.</p>
+    {{ end }}
+  </section>
+  {{ else }}
+  <div class="flex flex-col gap-6">
+    <section class="flex flex-col gap-1">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Leitura diária</p>
+          <h1 class="font-serif text-[26px] font-semibold leading-9 tracking-tight text-on-surface">{{ .Greeting }}</h1>
+        </div>
+        {{ if .SyncEnabled }}
+        <.form action="/sincronizar" method="post" class="contents">
+          <button type="submit" aria-label="Sincronizar biblioteca" class="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-on-secondary-container transition-transform duration-500 hover:text-primary active:rotate-180">
+            <span class="material-symbols-outlined text-[20px]">sync</span>
+          </button>
+        </.form>
+        {{ end }}
+      </div>
+      <p class="flex flex-wrap items-center gap-1.5 text-xs text-on-secondary-container">
+        <span class="material-symbols-outlined filled text-[15px] text-primary">cloud_done</span>
+        Acervo no Backblaze B2 · {{ .Totals.Total }} livros · {{ .Totals.Epubs }} EPUB · {{ .Totals.Pdfs }} PDF
+      </p>
+    </section>
+
+    <section class="flex items-center justify-between gap-3 rounded-2xl bg-surface-container-low p-4 shadow-sm">
+      <div class="flex min-w-0 items-center gap-3">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-primary shadow-sm">
+          <span class="material-symbols-outlined filled text-[22px]">local_fire_department</span>
+        </div>
+        <div class="min-w-0">
+          <p class="flex items-center gap-1.5 text-[15px] font-semibold text-on-surface">
+            {{ if eq .Stats.StreakDays 1 }}1 dia de sequência{{ else }}{{ .Stats.StreakDays }} dias de sequência{{ end }}
+          </p>
+          <p class="truncate text-[13px] text-secondary">{{ .MinutesToday }} min lidos hoje · meta de {{ .Stats.GoalMinutes }} min</p>
+        </div>
+      </div>
+      <div class="relative flex h-9 w-9 shrink-0 items-center justify-center">
+        <svg class="h-full w-full -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
+          <path class="text-surface-container-highest" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.5" />
+          <path class="text-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="{{ .GoalPercent }}, 100" stroke-linecap="round" stroke-width="3.5" />
+        </svg>
+        <span class="absolute text-[10px] font-bold text-on-surface">{{ .GoalPercent }}%</span>
+      </div>
+    </section>
+
+    {{ with .Continue }}
+    <section class="relative overflow-hidden rounded-2xl bg-surface-container p-4 shadow-md">
+      <div class="pointer-events-none absolute -bottom-10 -right-10 h-44 w-44 rounded-full bg-primary/5 blur-2xl"></div>
+      <div class="mb-2 flex items-center justify-between">
+        <div class="flex items-center gap-1.5">
+          <span class="h-2 w-2 animate-pulse rounded-full bg-primary"></span>
+          <span class="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Lendo agora</span>
+        </div>
+        <span class="rounded-full bg-surface-container-highest px-2 py-0.5 text-[11px] text-secondary">{{ .ChapterLabel }}</span>
+      </div>
+      <div class="flex items-start gap-4">
+        <div class="h-36 w-24 shrink-0 overflow-hidden rounded shadow-md">
+          {{ template "capa" (dict "titulo" .Book.Title "autor" .Book.Author "tom" .Book.Tone) }}
+        </div>
+        <div class="flex min-w-0 flex-1 flex-col justify-between gap-3 self-stretch">
+          <div class="min-w-0">
+            <h2 class="truncate font-serif text-[21px] font-semibold leading-7 text-on-surface">{{ .Book.Title }}</h2>
+            <p class="mt-0.5 truncate text-[13px] text-secondary">{{ if .Book.Author }}{{ .Book.Author }}{{ else }}{{ .Book.Category }}{{ end }}</p>
+            <p class="mt-1.5 flex items-center gap-1 text-xs text-on-secondary-container">
+              <span class="material-symbols-outlined text-[15px] text-outline">schedule</span>
+              {{ printf "%.0f" .Book.Percent }}% concluído
+            </p>
+          </div>
+          <div class="flex flex-col gap-2">
+            <div class="h-1.5 overflow-hidden rounded-full bg-surface-container-highest">
+              <div class="h-full rounded-full bg-primary transition-all duration-300" style="width: {{ printf "%.0f" .Book.Percent }}%"></div>
+            </div>
+            <a href="{{ if eq .Book.Format "epub" }}/livros/{{ .Book.ID }}/cap/{{ .Ordinal }}{{ else }}/livros/{{ .Book.ID }}{{ end }}" data-amarra-skip class="flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-on-primary shadow-sm transition-colors hover:bg-primary-container active:scale-[0.98]">
+              <span class="material-symbols-outlined filled text-[18px]">auto_stories</span>
+              <span class="text-[14px] font-medium leading-none">Continuar lendo</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+    {{ end }}
+
+    <section class="-mx-5 overflow-x-auto px-5 no-scrollbar">
+      <div class="flex items-center gap-2 py-0.5">
+        <a href="/" class="whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors {{ if and (eq .Filter "") (eq .Category "") }}bg-on-surface text-surface shadow-sm{{ else }}bg-surface-container-high text-on-secondary-container hover:text-on-surface{{ end }}">Todos ({{ .Totals.Total }})</a>
+        <a href="/?f=lendo" class="whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors {{ if eq .Filter "lendo" }}bg-on-surface text-surface shadow-sm{{ else }}bg-surface-container-high text-on-secondary-container hover:text-on-surface{{ end }}">Lendo ({{ .Totals.Lendo }})</a>
+        <a href="/?f=lidos" class="whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors {{ if eq .Filter "lidos" }}bg-on-surface text-surface shadow-sm{{ else }}bg-surface-container-high text-on-secondary-container hover:text-on-surface{{ end }}">Concluídos ({{ .Totals.Lidos }})</a>
+        <a href="/?f=nao_iniciados" class="whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors {{ if eq .Filter "nao_iniciados" }}bg-on-surface text-surface shadow-sm{{ else }}bg-surface-container-high text-on-secondary-container hover:text-on-surface{{ end }}">Na fila</a>
+        <a href="/?f=pdf" class="whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors {{ if eq .Filter "pdf" }}bg-on-surface text-surface shadow-sm{{ else }}bg-surface-container-high text-on-secondary-container hover:text-on-surface{{ end }}">PDF ({{ .Totals.Pdfs }})</a>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-3">
+      <div class="flex items-center justify-between">
+        <h3 class="font-serif text-lg font-semibold text-on-surface">
+          {{ if .Category }}{{ .Category }}{{ else if eq .Filter "lendo" }}Em andamento{{ else if eq .Filter "nao_iniciados" }}Na fila{{ else if eq .Filter "lidos" }}Concluídos{{ else if eq .Filter "pdf" }}PDFs{{ else }}Recentes na sua estante{{ end }}
+        </h3>
+        <a href="/colecoes" class="flex items-center text-[13px] font-medium text-primary hover:underline">
+          Ver coleções
+          <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+        </a>
+      </div>
+      {{ if .Books }}
+      <div class="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
+        {{ range .Books }}
+        <article class="group flex flex-col gap-2">
+          <a href="/livros/{{ .ID }}" data-amarra-skip class="relative block aspect-[1/1.5] w-full overflow-hidden rounded-lg bg-surface-container-high shadow-md">
+            {{ template "capa" (dict "titulo" .Title "autor" .Author "tom" .Tone) }}
+            {{ if eq .Format "pdf" }}
+            <span class="absolute right-2 top-2 rounded-full bg-inverse-surface/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-inverse-on-surface">PDF</span>
+            {{ end }}
+            {{ if .HasProgress }}
+            <span class="absolute bottom-2 left-2 right-2 flex items-center justify-between rounded bg-surface/90 px-2 py-1 backdrop-blur-sm">
+              {{ if ge .Percent 95.0 }}
+              <span class="text-[10px] font-semibold text-secondary">Lido</span>
+              <span class="material-symbols-outlined filled text-[13px] text-primary">check_circle</span>
+              {{ else }}
+              <span class="text-[10px] font-semibold text-primary">{{ printf "%.0f" .Percent }}% lido</span>
+              {{ end }}
+            </span>
+            {{ end }}
+          </a>
+          <div class="min-w-0">
+            <h4 class="truncate text-[15px] font-semibold leading-snug text-on-surface">{{ .Title }}</h4>
+            <p class="truncate text-[13px] text-secondary">{{ if .Author }}{{ .Author }}{{ else }}{{ .Category }}{{ end }}</p>
+          </div>
+        </article>
+        {{ end }}
+      </div>
+      {{ else }}
+      <div class="rounded-2xl bg-surface-container-low p-6 text-center text-sm text-secondary">Nada por aqui com esse filtro.</div>
+      {{ end }}
+    </section>
+  </div>
+  {{ end }}
+</div>
+{{ end }}

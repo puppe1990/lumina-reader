@@ -1,0 +1,50 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^web/static/
+      - id: end-of-file-fixer
+        exclude: ^web/static/
+      - id: check-yaml
+      - id: check-added-large-files
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        # web/templates is Go html/template; web/static is generated CSS/PWA.
+        # Exclude so UI-only commits do not fail with "No files matching" (#146).
+        exclude: ^(web/static/|web/templates/)
+        args: [--no-error-on-unmatched-pattern]
+
+  - repo: local
+    hooks:
+      # goimports matches CI golangci formatters + local-prefixes (#148). Install: go install golang.org/x/tools/cmd/goimports@latest
+      - id: goimports
+        name: goimports
+        entry: bash -c 'goimports -local "$(go list -m)" -w .'
+        language: system
+        pass_filenames: false
+        types: [go]
+
+      - id: go-test
+        name: go test
+        entry: go test ./... -race -count=1
+        language: system
+        pass_filenames: false
+        types: [go]
+
+      - id: golangci-lint
+        name: golangci-lint
+        entry: golangci-lint run ./...
+        language: system
+        pass_filenames: false
+        types: [go]
+
+      - id: npm-test
+        name: npm test
+        entry: npm test
+        language: system
+        pass_filenames: false
+        files: \.(js|json|css|html|md|ya?ml)$

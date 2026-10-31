@@ -1,0 +1,99 @@
+{{ define "content" }}
+<div class="mx-auto w-full max-w-3xl px-5 py-6">
+  <a href="/" class="mb-4 inline-flex items-center gap-1 text-[13px] text-on-surface-variant transition-colors hover:text-on-surface">
+    <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+    Biblioteca
+  </a>
+
+  <section class="flex gap-4 sm:gap-6">
+    <div class="h-56 w-36 shrink-0 overflow-hidden rounded-lg shadow-lg sm:h-64 sm:w-44">
+      {{ template "capa" (dict "titulo" .Book.Title "autor" .Book.Author "tom" .Tone) }}
+    </div>
+    <div class="flex min-w-0 flex-col gap-2">
+      <h1 class="font-serif text-[22px] font-semibold leading-8 text-on-surface sm:text-2xl">{{ .Book.Title }}</h1>
+      <p class="text-sm text-secondary">{{ if .Book.Author }}{{ .Book.Author }}{{ else }}{{ .Book.Category }}{{ end }}</p>
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="rounded-full bg-surface-container-high px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-on-secondary-container">{{ .Book.Format }}</span>
+        <span class="rounded-full bg-surface-container-high px-2 py-0.5 text-[10px] text-on-secondary-container">{{ .FileSize }}</span>
+        {{ if gt .MinutesTotal 0 }}
+        <span class="rounded-full bg-surface-container-high px-2 py-0.5 text-[10px] text-on-secondary-container">~{{ .MinutesTotal }} min de leitura</span>
+        {{ end }}
+      </div>
+      {{ if .HasProgress }}
+      <div class="mt-1 flex flex-col gap-1.5">
+        <div class="h-1.5 w-full max-w-[220px] overflow-hidden rounded-full bg-surface-container-highest">
+          <div class="h-full rounded-full bg-primary" style="width: {{ .Percent }}%"></div>
+        </div>
+        <span class="text-[11px] text-on-secondary-container">{{ .Percent }}% concluído</span>
+      </div>
+      {{ end }}
+      <div class="mt-2 flex flex-wrap items-center gap-2">
+        {{ if eq .Book.Format "epub" }}
+        <a href="/livros/{{ .Book.ID }}/cap/{{ .Continue }}" data-amarra-skip class="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-on-primary shadow-sm transition-colors hover:bg-primary-container active:scale-[0.98]">
+          <span class="material-symbols-outlined filled text-[18px]">auto_stories</span>
+          <span class="text-sm font-medium">{{ if .HasProgress }}Continuar lendo{{ else }}Começar a leitura{{ end }}</span>
+        </a>
+        <a href="/livros/{{ .Book.ID }}/arquivo?baixar=1" class="flex items-center gap-2 rounded-xl bg-surface-container-high px-4 py-2.5 text-on-surface transition-colors hover:bg-surface-container-highest">
+          <span class="material-symbols-outlined text-[18px]">download</span>
+          <span class="text-sm font-medium">Baixar EPUB</span>
+        </a>
+        {{ else if eq .Book.Format "pdf" }}
+        <a href="/livros/{{ .Book.ID }}/arquivo" target="_blank" rel="noopener" class="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-on-primary shadow-sm transition-colors hover:bg-primary-container active:scale-[0.98]">
+          <span class="material-symbols-outlined filled text-[18px]">picture_as_pdf</span>
+          <span class="text-sm font-medium">Abrir PDF</span>
+        </a>
+        <a href="/livros/{{ .Book.ID }}/arquivo?baixar=1" class="flex items-center gap-2 rounded-xl bg-surface-container-high px-4 py-2.5 text-on-surface transition-colors hover:bg-surface-container-highest">
+          <span class="material-symbols-outlined text-[18px]">download</span>
+          <span class="text-sm font-medium">Baixar</span>
+        </a>
+        {{ else }}
+        <a href="/livros/{{ .Book.ID }}/arquivo?baixar=1" class="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-on-primary shadow-sm transition-colors hover:bg-primary-container active:scale-[0.98]">
+          <span class="material-symbols-outlined text-[18px]">download</span>
+          <span class="text-sm font-medium">Baixar arquivo</span>
+        </a>
+        <p class="text-[11px] text-secondary">O leitor web renderiza EPUB; este formato abre no app de leitura do sistema.</p>
+        {{ end }}
+      </div>
+    </div>
+  </section>
+
+  {{ if and (eq .Book.Format "epub") (not .Chapters) }}
+  <p class="mt-8 rounded-xl bg-surface-container-low p-4 text-sm leading-6 text-secondary">
+    Os capítulos são preparados na primeira abertura — "Começar a leitura" baixa o livro do B2 e converte o texto para o leitor.
+  </p>
+  {{ end }}
+
+  {{ if .Chapters }}
+  <section class="mt-8">
+    <h2 class="mb-2 font-serif text-lg font-semibold text-on-surface">Sumário</h2>
+    <ol class="divide-y divide-on-surface/5 overflow-hidden rounded-xl bg-surface-container-low">
+      {{ range .Chapters }}
+      <li>
+        <a href="/livros/{{ $.Book.ID }}/cap/{{ .Ordinal }}" data-amarra-skip class="flex items-center justify-between gap-3 px-4 py-3 text-sm text-on-surface transition-colors hover:bg-surface-container">
+          <span class="min-w-0 truncate">{{ .Title }}</span>
+          <span class="shrink-0 text-[11px] text-secondary">{{ .Words }} palavras</span>
+        </a>
+      </li>
+      {{ end }}
+    </ol>
+  </section>
+  {{ end }}
+
+  {{ if .Notes }}
+  <section class="mt-8">
+    <div class="mb-2 flex items-center justify-between">
+      <h2 class="font-serif text-lg font-semibold text-on-surface">Destaques</h2>
+      <a href="/notas?livro={{ .Book.ID }}" class="text-[13px] font-medium text-primary hover:underline">Abrir no caderno</a>
+    </div>
+    <div class="flex flex-col gap-2">
+      {{ range .Notes }}
+      <a href="/livros/{{ .BookID }}/cap/{{ .ChapterOrdinal }}?nota={{ .ID }}" data-amarra-skip class="rounded-xl border-l-4 bg-surface-container-low p-3 transition-colors hover:bg-surface-container nota-{{ .Color }}">
+        <p class="text-[13px] italic leading-6 text-on-surface">"{{ .Excerpt }}"</p>
+        {{ if .NoteText }}<p class="mt-1.5 text-[12px] text-secondary">{{ .NoteText }}</p>{{ end }}
+      </a>
+      {{ end }}
+    </div>
+  </section>
+  {{ end }}
+</div>
+{{ end }}

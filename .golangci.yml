@@ -1,0 +1,32 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - gocritic
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/puppe1990/lumina
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

@@ -1,0 +1,119 @@
+{{ define "app" }}
+<!doctype html>
+<html lang="pt-BR" data-amarra-layout="app">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    {{ if .CSRFToken }}<meta name="csrf-token" content="{{ .CSRFToken }}" />{{ end }}
+    <title>{{ if .Title }}{{ .Title }} · Lumina{{ else }}Lumina{{ end }}</title>
+    <meta name="description" content="Lumina — leitor editorial do acervo pessoal, direto do Backblaze B2." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Lumina" />
+    <meta property="og:title" content="{{ if .Title }}{{ .Title }}{{ else }}Lumina{{ end }}" />
+    <meta property="og:description" content="Leitor editorial do acervo pessoal — biblioteca, leitura imersiva e caderno de notas." />
+    <meta property="og:image" content="{{ absURL .Site.AppURL "/static/og.png" }}" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;0,7..72,700;1,7..72,400;1,7..72,600&family=Inter:wght@400;500;600;700&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="manifest" href="/static/manifest.webmanifest" />
+    <meta name="theme-color" content="#fcf9f8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Lumina" />
+    <link rel="apple-touch-icon" href="/static/icons/icon.png" />
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+    <script src="/static/js/amarra.js" defer></script>
+    <script src="/static/js/lumina.js" defer></script>
+  </head>
+  <body class="min-h-screen bg-surface font-sans text-on-surface antialiased" data-amarra-shell="{{ if .Site.LoggedIn }}app{{ else }}auth{{ end }}">
+    {{ if .Site.LoggedIn }}
+    <header class="sticky top-0 z-40 bg-surface/85 shadow-[0_1px_8px_rgba(0,0,0,0.03)] backdrop-blur-xl">
+      <div class="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-2 px-5">
+        <a href="/" class="flex items-center gap-2.5">
+          <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden="true">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 6.6C10.5 5.4 8.6 4.9 6.4 5c-.9 0-1.7.1-2.4.3v13c.7-.2 1.5-.3 2.4-.3 2.2 0 4.1.5 5.6 1.7 1.5-1.2 3.4-1.7 5.6-1.7.9 0 1.7.1 2.4.3V5.3c-.7-.2-1.5-.3-2.4-.3-2.2-.1-4.1.4-5.6 1.6Z" />
+              <path d="M12 6.6v13.1" />
+            </svg>
+          </span>
+          <span class="font-serif text-[19px] font-semibold tracking-tight text-on-surface">Lumina</span>
+        </a>
+        <div class="flex items-center gap-1">
+          <a href="/buscar" aria-label="Buscar livros" class="flex h-11 w-11 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface">
+            <span class="material-symbols-outlined text-[22px]">search</span>
+          </a>
+          <.form action="/logout" method="post" class="contents">
+            <button type="submit" aria-label="Sair" class="flex h-11 w-11 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface">
+              <span class="material-symbols-outlined text-[20px]">logout</span>
+            </button>
+          </.form>
+        </div>
+      </div>
+    </header>
+    {{ end }}
+    <div id="amarra-toast-host" aria-live="polite"></div>
+    <main id="amarra-main" class="flex-grow {{ if .Site.LoggedIn }}pb-24{{ end }}">
+      <.flash />
+      {{ template "content" . }}
+    </main>
+    {{ if .Site.LoggedIn }}
+    <nav class="fixed bottom-0 left-0 right-0 z-40 border-t border-on-surface/5 bg-surface/95 shadow-[0_-2px_12px_rgba(0,0,0,0.04)] backdrop-blur-xl">
+      <div amarra-hook="nav" data-amarra-nav-on="text-primary" data-amarra-nav-off="text-on-surface-variant" class="mx-auto flex h-16 w-full max-w-5xl items-stretch justify-around px-1">
+        <a href="/" class="flex min-w-[68px] flex-col items-center justify-center gap-0.5 px-2 transition-colors {{ if eq .ActiveNav "biblioteca" }}text-primary{{ else }}text-on-surface-variant{{ end }}">
+          <span class="material-symbols-outlined text-[24px]">shelves</span>
+          <span class="text-[11px] font-medium">Biblioteca</span>
+        </a>
+        <a href="/lendo" data-amarra-skip class="flex min-w-[68px] flex-col items-center justify-center gap-0.5 px-2 transition-colors {{ if eq .ActiveNav "lendo" }}text-primary{{ else }}text-on-surface-variant{{ end }}">
+          <span class="material-symbols-outlined text-[24px]">menu_book</span>
+          <span class="text-[11px] font-medium">Lendo</span>
+        </a>
+        <a href="/colecoes" class="flex min-w-[68px] flex-col items-center justify-center gap-0.5 px-2 transition-colors {{ if eq .ActiveNav "colecoes" }}text-primary{{ else }}text-on-surface-variant{{ end }}">
+          <span class="material-symbols-outlined text-[24px]">collections_bookmark</span>
+          <span class="text-[11px] font-medium">Coleções</span>
+        </a>
+        <a href="/notas" class="flex min-w-[68px] flex-col items-center justify-center gap-0.5 px-2 transition-colors {{ if eq .ActiveNav "notas" }}text-primary{{ else }}text-on-surface-variant{{ end }}">
+          <span class="material-symbols-outlined text-[24px]">edit_note</span>
+          <span class="text-[11px] font-medium">Notas</span>
+        </a>
+      </div>
+    </nav>
+    {{ end }}
+    {{ if eq .Site.Env "development" }}
+    <script nonce="{{ .CSPNonce }}">
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          regs.forEach(function (r) { r.unregister(); });
+        });
+        if ("caches" in window) {
+          caches.keys().then(function (keys) {
+            keys.forEach(function (k) { caches.delete(k); });
+          });
+        }
+      }
+      (function () {
+        if (!("EventSource" in window)) return;
+        if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) return;
+        var es = new EventSource("/_dev/reload");
+        es.addEventListener("reload", function () { location.reload(); });
+        es.addEventListener("boot", function (ev) {
+          var seen = sessionStorage.getItem("amarra-dev-boot");
+          sessionStorage.setItem("amarra-dev-boot", ev.data);
+          if (seen && seen !== ev.data) location.reload();
+        });
+      })();
+    </script>
+    {{ else }}
+    <script nonce="{{ .CSPNonce }}">
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/static/js/sw.js", { scope: "/" });
+      }
+    </script>
+    {{ end }}
+  </body>
+</html>
+{{ end }}

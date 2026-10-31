@@ -1,0 +1,10 @@
+{{ define "capa" }}
+{{/* Capa tipográfica: a lombada nasce do tom (0..5) e o título vira a capa. Contexto: dict "titulo", "autor", "tom". */}}
+<div class="capa capa-tom-{{ .tom }}" aria-hidden="true">
+  <span class="capa-filete"></span>
+  <span class="capa-titulo">{{ .titulo }}</span>
+  <span class="capa-selo">
+    {{ if .autor }}{{ .autor }}{{ else }}Lumina{{ end }}
+  </span>
+</div>
+{{ end }}

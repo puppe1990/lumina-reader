@@ -1,0 +1,155 @@
+{{ define "content" }}
+<script nonce="{{ .CSPNonce }}">
+  try {
+    var c = localStorage.getItem("lumina-canvas");
+    if (c) document.documentElement.setAttribute("data-canvas", c);
+    var t = parseInt(localStorage.getItem("lumina-tamanho") || "2", 10);
+    var tamanhos = [16, 17, 18, 20, 22];
+    document.documentElement.style.setProperty("--reader-font-size", (tamanhos[t] || 18) + "px");
+  } catch (e) {}
+</script>
+<div class="leitor-root" data-leitor data-book="{{ .Book.ID }}" data-cap="{{ .Ordinal }}" data-percent="{{ .Percent }}" data-restore="{{ .Restore }}">
+  <script type="application/json" id="leitor-notas" nonce="{{ .CSPNonce }}">{{ .NotesJSON }}</script>
+
+  <div class="mx-auto w-full max-w-3xl px-4 pt-3">
+    <div class="flex items-center justify-between gap-2 rounded-xl bg-surface-container-low/90 px-2 py-1.5 shadow-sm backdrop-blur-md">
+      <div class="flex min-w-0 items-center gap-1">
+        <a href="/livros/{{ .Book.ID }}" data-amarra-skip aria-label="Voltar para o livro" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-on-surface transition-colors hover:bg-surface-container">
+          <span class="material-symbols-outlined text-[20px]">arrow_back</span>
+        </a>
+        <div class="min-w-0 pr-1">
+          <span class="block truncate text-[10px] uppercase tracking-widest text-on-surface-variant">{{ .Book.Title }}</span>
+          <span class="block truncate font-serif text-[17px] font-semibold leading-6 text-on-surface">{{ .Chapter.Title }}</span>
+        </div>
+      </div>
+      <div class="flex shrink-0 items-center gap-0.5">
+        <button type="button" data-marcador aria-pressed="{{ .Marker }}" aria-label="Marcador de página" class="flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-surface-container {{ if .Marker }}text-primary{{ else }}text-on-surface-variant{{ end }}">
+          <span class="material-symbols-outlined text-[20px]" {{ if .Marker }}style="font-variation-settings:'FILL' 1"{{ end }}>bookmark</span>
+        </button>
+        <span class="contents" amarra-hook="dialog">
+          <button type="button" data-amarra-dialog-open aria-label="Sumário" class="flex h-10 w-10 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface">
+            <span class="material-symbols-outlined text-[20px]">toc</span>
+          </button>
+          <dialog data-amarra-dialog-target id="dlg-sumario" class="m-auto w-[min(92vw,26rem)] max-h-[80vh] rounded-2xl bg-surface p-0 text-on-surface shadow-xl backdrop:bg-black/25 backdrop:backdrop-blur-sm">
+            <div class="flex items-center justify-between border-b border-on-surface/5 px-5 py-3">
+              <span class="text-sm font-semibold">Sumário</span>
+              <span class="text-[11px] text-secondary">{{ .Total }} capítulos</span>
+            </div>
+            <ol class="max-h-[60vh] overflow-y-auto py-1">
+              {{ range .TOC }}
+              <li>
+                <a href="/livros/{{ $.Book.ID }}/cap/{{ .Ordinal }}" data-amarra-skip class="flex items-center gap-3 px-5 py-2.5 text-sm transition-colors hover:bg-surface-container-low {{ if .Ativo }}font-semibold text-primary{{ else }}text-on-surface{{ end }}">
+                  <span class="w-6 shrink-0 text-right text-[11px] text-secondary">{{ .Numero }}</span>
+                  <span class="min-w-0 truncate">{{ .Title }}</span>
+                </a>
+              </li>
+              {{ end }}
+            </ol>
+          </dialog>
+        </span>
+        <span class="contents" amarra-hook="dialog">
+          <button type="button" data-amarra-dialog-open aria-label="Tipografia e tema" class="flex h-10 w-10 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface">
+            <span class="material-symbols-outlined text-[20px]">format_size</span>
+          </button>
+          <dialog data-amarra-dialog-target id="dlg-tipografia" class="m-auto w-[min(92vw,24rem)] rounded-2xl bg-surface p-0 text-on-surface shadow-xl backdrop:bg-black/25 backdrop:backdrop-blur-sm">
+            <div class="flex flex-col gap-4 p-5">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold">Tipografia &amp; página</span>
+                <button type="button" data-amarra-dialog-close class="flex h-7 w-7 items-center justify-center rounded-full bg-surface-container text-on-surface-variant hover:text-on-surface" aria-label="Fechar">
+                  <span class="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              </div>
+              <div class="flex items-center justify-between rounded-xl bg-surface-container px-4 py-2" data-tamanho-rotulo="1">
+                <button type="button" data-tamanho="menos" class="rounded-lg px-3 py-1 font-serif text-sm text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface" aria-label="Diminuir texto">A-</button>
+                <div class="flex items-center gap-1.5" data-tamanho-pontos>
+                  <span class="h-2 w-2 rounded-full bg-primary"></span>
+                  <span class="h-2 w-2 rounded-full bg-primary"></span>
+                  <span class="h-2 w-2 rounded-full bg-primary"></span>
+                  <span class="h-2 w-2 rounded-full bg-surface-container-highest"></span>
+                  <span class="h-2 w-2 rounded-full bg-surface-container-highest"></span>
+                </div>
+                <button type="button" data-tamanho="mais" class="rounded-lg px-3 py-1 font-serif text-base font-bold text-on-surface transition-colors hover:bg-surface-container-high" aria-label="Aumentar texto">A+</button>
+              </div>
+              <div class="grid grid-cols-4 gap-2">
+                <button type="button" data-canvas-opcao="claro" class="flex flex-col items-center gap-1 rounded-xl p-2 shadow-sm bg-white">
+                  <span class="h-4 w-4 rounded-full bg-[#fdfcfa] shadow ring-1 ring-black/10"></span>
+                  <span class="text-[10px] font-medium text-[#1c1b1b]">Claro</span>
+                </button>
+                <button type="button" data-canvas-opcao="sepia" class="flex flex-col items-center gap-1 rounded-xl p-2 shadow-sm bg-[#fbf0d9]">
+                  <span class="h-4 w-4 rounded-full bg-[#f3e5c8] shadow"></span>
+                  <span class="text-[10px] font-medium text-[#4a3a22]">Sépia</span>
+                </button>
+                <button type="button" data-canvas-opcao="crepusculo" class="flex flex-col items-center gap-1 rounded-xl p-2 shadow-sm bg-[#e9e4da]">
+                  <span class="h-4 w-4 rounded-full bg-[#d8d2c6] shadow"></span>
+                  <span class="text-[10px] font-medium text-[#37332c]">Crepúsculo</span>
+                </button>
+                <button type="button" data-canvas-opcao="noite" class="flex flex-col items-center gap-1 rounded-xl p-2 shadow-sm bg-[#1c1c1e]">
+                  <span class="h-4 w-4 rounded-full bg-[#3a3a3c] shadow"></span>
+                  <span class="text-[10px] font-medium text-[#d0d0d0]">Noite</span>
+                </button>
+              </div>
+              <p class="text-[10px] leading-4 text-secondary">O tema, o tamanho do texto e a posição de leitura ficam salvos neste navegador. O progresso sincroniza sozinho.</p>
+            </div>
+          </dialog>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="leitor-canvas" data-canvas="sepia">
+    <div class="mx-auto w-full max-w-2xl px-6 pb-4 pt-8 sm:px-10">
+      <article id="readerCanvas" class="leitor-artigo">
+        <div class="pb-8 pt-1 text-center">
+          <span class="block text-[10px] uppercase tracking-[0.2em] text-on-surface-variant">{{ .ChapterNumero }}</span>
+          <h2 class="mt-1 font-serif text-[24px] font-semibold italic leading-8">{{ .Chapter.Title }}</h2>
+          <div class="mx-auto mt-3 h-px w-8 bg-outline-variant/60"></div>
+        </div>
+        <div class="leitor-texto">{{ .ChapterHTML }}</div>
+        <div class="flex items-center justify-center gap-2 pb-1 pt-8 text-outline-variant">
+          <span class="h-1.5 w-1.5 rounded-full bg-outline-variant/70"></span>
+          <span class="h-2 w-2 rounded-full bg-primary/40"></span>
+          <span class="h-1.5 w-1.5 rounded-full bg-outline-variant/70"></span>
+        </div>
+      </article>
+    </div>
+
+    <footer class="leitor-progresso mx-auto w-full max-w-2xl px-6 pb-4 pt-2 select-none">
+      <div class="h-[3px] w-full overflow-hidden rounded-full bg-secondary-container/60">
+        <div class="h-full rounded-full bg-primary/70" style="width: {{ .Percent }}%"></div>
+      </div>
+      <div class="mt-1.5 flex items-center justify-between text-[10px] text-on-secondary-container">
+        <span>Posição {{ .Position }}</span>
+        <span id="percentual" class="font-semibold text-primary">{{ .Percent }}% concluído</span>
+        <span>{{ .MinutesLeft }} min no cap.</span>
+      </div>
+    </footer>
+  </div>
+
+  <div class="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-5 pb-8 pt-4">
+    {{ if ge .Prev 0 }}
+    <a href="/livros/{{ .Book.ID }}/cap/{{ .Prev }}" data-amarra-skip class="flex items-center gap-1.5 rounded-xl bg-surface-container-high px-4 py-2.5 text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-highest">
+      <span class="material-symbols-outlined text-[18px]">arrow_back</span> Anterior
+    </a>
+    {{ else }}<span></span>{{ end }}
+    {{ if ge .Next 0 }}
+    <a href="/livros/{{ .Book.ID }}/cap/{{ .Next }}" data-amarra-skip class="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-on-primary shadow-sm transition-colors hover:bg-primary-container">
+      Próximo <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+    </a>
+    {{ end }}
+  </div>
+
+  <div id="barra-selecao" class="fixed z-50 hidden -translate-x-1/2 items-center gap-1 rounded-full bg-inverse-surface px-2 py-1.5 text-inverse-on-surface shadow-lg">
+    <button type="button" data-destaque="amarelo" aria-label="Destaque amarelo" class="h-6 w-6 rounded-full ring-1 ring-white/20 bg-[#ffae42]"></button>
+    <button type="button" data-destaque="verde" aria-label="Destaque verde" class="h-6 w-6 rounded-full ring-1 ring-white/20 bg-[#86bb89]"></button>
+    <button type="button" data-destaque="azul" aria-label="Destaque azul" class="h-6 w-6 rounded-full ring-1 ring-white/20 bg-[#b3a1d9]"></button>
+    <button type="button" data-destaque="rosa" aria-label="Destaque rosa" class="h-6 w-6 rounded-full ring-1 ring-white/20 bg-[#e0a3b8]"></button>
+    <span class="mx-1 h-5 w-px bg-white/15"></span>
+    <button type="button" data-acao="copiar" class="flex h-7 items-center gap-1 rounded-full px-2 text-[11px] font-medium hover:bg-white/10">
+      <span class="material-symbols-outlined text-[14px]">content_copy</span> Copiar
+    </button>
+    <button type="button" data-acao="nota" class="flex h-7 items-center gap-1 rounded-full px-2 text-[11px] font-medium hover:bg-white/10">
+      <span class="material-symbols-outlined text-[14px]">stylus_note</span> Nota
+    </button>
+  </div>
+</div>
+{{ end }}

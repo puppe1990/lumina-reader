@@ -1,0 +1,28 @@
+{{ define "content" }}
+<div class="mx-auto w-full max-w-5xl px-5 py-6">
+  <div class="mb-5">
+    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Coleções</p>
+    <h1 class="font-serif text-[26px] font-semibold leading-9 tracking-tight text-on-surface">Prateleiras do acervo</h1>
+    <p class="mt-1 text-[13px] text-secondary">{{ .Totals.Total }} livros em {{ len .Categories }} categorias · {{ .Totals.Epubs }} EPUB · {{ .Totals.Pdfs }} PDF</p>
+  </div>
+  {{ if .Categories }}
+  <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    {{ range .Categories }}
+    <a href="/?cat={{ .Name }}" class="group flex flex-col gap-2 rounded-2xl bg-surface-container-low p-4 shadow-sm transition-colors hover:bg-surface-container">
+      <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-fixed/60 text-primary">
+        <span class="material-symbols-outlined text-[22px]">bookmark</span>
+      </span>
+      <span class="min-w-0">
+        <span class="block truncate font-serif text-[16px] font-semibold text-on-surface">{{ .Name }}</span>
+        <span class="text-[12px] text-secondary">{{ if eq .Total 1 }}1 livro{{ else }}{{ .Total }} livros{{ end }}</span>
+      </span>
+    </a>
+    {{ end }}
+  </div>
+  {{ else }}
+  <div class="rounded-2xl bg-surface-container-low p-8 text-center text-sm text-secondary">
+    Nada aqui ainda — sincronize a estante na Biblioteca.
+  </div>
+  {{ end }}
+</div>
+{{ end }}

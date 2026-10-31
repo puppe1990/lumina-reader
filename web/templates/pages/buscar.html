@@ -1,0 +1,39 @@
+{{ define "content" }}
+<div class="mx-auto w-full max-w-5xl px-5 py-6">
+  <h1 class="mb-4 font-serif text-[26px] font-semibold leading-9 tracking-tight text-on-surface">Buscar</h1>
+  <form action="/buscar" method="get" class="mb-6">
+    <div class="flex items-center gap-2 rounded-2xl bg-surface-container-low px-4 py-2 shadow-sm ring-1 ring-transparent focus-within:ring-primary/40">
+      <span class="material-symbols-outlined text-[20px] text-on-secondary-container">search</span>
+      <input type="search" name="q" value="{{ .Query }}" placeholder="Título ou autor…" autofocus class="w-full bg-transparent py-1.5 text-[15px] text-on-surface outline-none placeholder:text-secondary/70" />
+      <button type="submit" class="rounded-lg bg-primary px-3 py-1.5 text-[13px] font-medium text-on-primary transition-colors hover:bg-primary-container">Buscar</button>
+    </div>
+  </form>
+
+  {{ if .Query }}
+    {{ if .Books }}
+    <p class="mb-3 text-[13px] text-secondary">{{ len .Books }} resultado(s) para "{{ .Query }}"</p>
+    <div class="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
+      {{ range .Books }}
+      <article class="group flex flex-col gap-2">
+        <a href="/livros/{{ .ID }}" data-amarra-skip class="relative block aspect-[1/1.5] w-full overflow-hidden rounded-lg bg-surface-container-high shadow-md">
+          {{ template "capa" (dict "titulo" .Title "autor" .Author "tom" .Tone) }}
+        </a>
+        <div class="min-w-0">
+          <h4 class="truncate text-[15px] font-semibold leading-snug text-on-surface">{{ .Title }}</h4>
+          <p class="truncate text-[13px] text-secondary">{{ if .Author }}{{ .Author }}{{ else }}{{ .Category }}{{ end }}</p>
+        </div>
+      </article>
+      {{ end }}
+    </div>
+    {{ else }}
+    <div class="flex flex-col items-center gap-2 rounded-2xl bg-surface-container-low px-4 py-16 text-center">
+      <span class="material-symbols-outlined text-[44px] text-primary/60">search_off</span>
+      <p class="text-sm font-medium text-on-surface">Nada encontrado</p>
+      <p class="max-w-xs text-[13px] text-secondary">Tente outro trecho do título ou o nome de quem escreveu.</p>
+    </div>
+    {{ end }}
+  {{ else }}
+  <p class="text-[13px] text-secondary">Digite para buscar no acervo inteiro — título ou autor.</p>
+  {{ end }}
+</div>
+{{ end }}
