@@ -19,6 +19,41 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;0,7..72,700;1,7..72,400;1,7..72,600&family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
     <link rel="stylesheet" href="/static/css/styles.css" />
+    <script nonce="{{ .CSPNonce }}">
+      // Guarda de CSS: se a folha não aplicou (rede caiu no meio, resposta
+      // truncada, cache envenenado), re-tenta com cache-bust em vez de deixar a
+      // página crua. Máx. 3 tentativas por sessão para não virar loop.
+      (function () {
+        function folhaAplicada() {
+          var folhas = document.styleSheets;
+          for (var i = 0; i < folhas.length; i++) {
+            var href = folhas[i].href || "";
+            if (href.indexOf("/static/css/styles.css") === -1) continue;
+            try {
+              return folhas[i].cssRules.length > 50;
+            } catch (e) {
+              return true; // mesma origem: exceção aqui significa que carregou
+            }
+          }
+          return false;
+        }
+        window.addEventListener("load", function () {
+          if (folhaAplicada()) return;
+          var tentativa = 0;
+          try {
+            tentativa = parseInt(sessionStorage.getItem("lumina-css-retry") || "0", 10) || 0;
+          } catch (e) {}
+          if (tentativa >= 3) return;
+          try {
+            sessionStorage.setItem("lumina-css-retry", String(tentativa + 1));
+          } catch (e) {}
+          var link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = "/static/css/styles.css?retry=" + (tentativa + 1) + "&t=" + Date.now();
+          document.head.appendChild(link);
+        });
+      })();
+    </script>
     <link rel="manifest" href="/static/manifest.webmanifest" />
     <meta name="theme-color" content="#fcf9f8" />
     <meta name="mobile-web-app-capable" content="yes" />

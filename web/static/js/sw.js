@@ -1,4 +1,4 @@
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 const CACHE = "cais-static-v" + CACHE_VERSION;
 
 const PRECACHE = [
@@ -58,7 +58,9 @@ function networkFirst(request, fallbackURL, allowCachedFallback = false) {
     })
     .catch(() => {
       if (allowCachedFallback) {
-        return caches.match(request).then((cached) => {
+        // ignoreSearch: a página pede styles.css?retry=N para furar cache —
+        // offline (ou rede instável) a cópia sem query ainda serve.
+        return caches.match(request, { ignoreSearch: true }).then((cached) => {
           if (cached) return cached;
           if (!fallbackURL) return Response.error();
           return caches.match(fallbackURL).then((fb) => fb || Response.error());
