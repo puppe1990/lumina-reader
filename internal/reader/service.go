@@ -211,6 +211,11 @@ func normalizarCapa(imagem []byte, tipo string) ([]byte, string, error) {
 	return saida.Bytes(), "image/jpeg", nil
 }
 
+// errCapaFerramentaAusente distingue "poppler não instalado" de "livro sem
+// capa": sem a ferramenta o registro não é persistido, então instalar o pacote
+// depois já resolve na próxima request.
+var errCapaFerramentaAusente = errors.New("ferramenta de capa ausente")
+
 // ErrNoCover sinaliza livro sem capa identificável (o handler responde 404 e a
 // UI cai na capa tipográfica).
 var ErrNoCover = errors.New("livro sem capa")
@@ -229,6 +234,9 @@ func (s *Service) Cover(ctx context.Context, book models.Book) ([]byte, string, 
 	}
 
 	imagem, tipo, err := s.extrairCapa(ctx, book)
+	if errors.Is(err, errCapaFerramentaAusente) {
+		return nil, "", ErrNoCover
+	}
 	if errors.Is(err, ErrNoCover) {
 		_ = s.store.SaveCover(models.Cover{BookID: book.ID, Missing: true})
 		return nil, "", ErrNoCover
@@ -274,11 +282,12 @@ func (s *Service) extrairCapa(ctx context.Context, book models.Book) ([]byte, st
 	}
 }
 
-// capaDePDF renderiza a primeira página; sem poppler instalado não há capa.
+// capaDePDF renderiza a primeira página; sem poppler instalado não há capa
+// agora — e nada é cacheado como ausente (instalar o pacote resolve depois).
 func (s *Service) capaDePDF(ctx context.Context, book models.Book) ([]byte, string, error) {
 	ferramenta, err := exec.LookPath("pdftoppm")
 	if err != nil {
-		return nil, "", ErrNoCover
+		return nil, "", errCapaFerramentaAusente
 	}
 	caminho, err := s.EnsureFile(ctx, book)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"errors"
 	"image"
 	"image/jpeg"
 	"image/png"
@@ -190,6 +191,21 @@ func TestCover_ExtractsAndCachesEPUBCover(t *testing.T) {
 	salva := store.covers[livro.ID]
 	if salva.Missing || len(salva.Image) == 0 {
 		t.Errorf("capa não cacheada: %+v", salva)
+	}
+}
+
+func TestCover_PDFWithoutPopplerDoesNotPersistMissing(t *testing.T) {
+	t.Setenv("PATH", "")
+	remoto := &fakeRemote{dados: []byte("%PDF-1.4 capa")}
+	store := newMemoryChapters()
+	servico := New(remoto, store, t.TempDir())
+	livro := models.Book{ID: 3, RemoteKey: "Cat/A/Livro.pdf", SHA1: "pdf123", Format: "pdf"}
+
+	if _, _, err := servico.Cover(context.Background(), livro); !errors.Is(err, ErrNoCover) {
+		t.Fatalf("Cover sem poppler: err = %v, want ErrNoCover", err)
+	}
+	if _, marcado := store.covers[livro.ID]; marcado {
+		t.Error("sem a ferramenta não pode marcar missing (instalar o poppler resolve depois)")
 	}
 }
 

@@ -1,0 +1,5 @@
+{
+  "release_command": [
+    "command -v pdftoppm >/dev/null 2>&1 || sudo DEBIAN_FRONTEND=noninteractive apt-get install -y poppler-utils"
+  ]
+}
