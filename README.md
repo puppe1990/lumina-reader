@@ -8,9 +8,9 @@ Live: https://lumina-reader.apps.gestaobem.com
 
 - **Biblioteca** (`/`) — sincroniza o balde B2 para o SQLite, capa tipográfica por livro (tom determinístico), chips de filtro, hero "lendo agora" e sequência de leitura (dias + minutos do dia).
 - **Leitura** (`/livros/{id}/cap/{n}`) — capítulos sanitizados do EPUB (bluemonday), imagens servidas do próprio arquivo (`/livros/{id}/recurso/...`), capitular, sumário, marcador, posição e pulso de tempo salvos no servidor.
-- **Destaques** — seleção de texto abre a barra com 4 cores; o trecho vira `mark` no texto ao reabrir e aparece no **Caderno** (`/notas`) com "ir para o capítulo", edição e remoção.
-- **PDF** — abre inline no navegador (`/livros/{id}/arquivo`) com download ao lado; o leitor web renderiza EPUB.
-- **Coleções e busca** — navegação por categoria e busca por título/autor.
+- **PDF** (`/livros/{id}/pdf`) — leitor de PDF com pdf.js: scroll contínuo página a página (render só do que está perto da tela), tema claro/sépia/crepúsculo e Noite (inversão das páginas), progresso "Página X de Y" salvo, marcador e busca no texto do PDF. O original continua acessível por "Abrir no navegador" e download.
+- **Destaques** — seleção de texto abre a barra com 4 cores; o trecho vira `mark` no texto ao reabrir e aparece no **Caderno** (`/notas`) com "ir para o capítulo", edição e remoção. (Destaques valem para EPUB; PDF ainda não.)
+- **Coleções e busca** — navegação por categoria, busca por título/autor e busca dentro do livro (EPUB no texto dos capítulos; PDF via pdf.js).
 
 A biblioteca é privada: login por sessão (sem cadastro público). `Documentos Pessoais/` do balde fica fora da estante.
 

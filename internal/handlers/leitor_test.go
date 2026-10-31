@@ -129,6 +129,51 @@ func TestReader_PulseAddsSeconds(t *testing.T) {
 	}
 }
 
+func TestReader_PDFPageRendersAndProgressUsesPages(t *testing.T) {
+	s := setupTestStore(t)
+	id := seedLivro(t, s, "Cat/A/Livro.pdf", "Livro Pdf", "", "Cat", "pdf")
+	h := newReaderHandler(t, s)
+
+	req := httptest.NewRequest(http.MethodGet, "/livros/"+itoa64(id)+"/pdf", nil)
+	rr := httptest.NewRecorder()
+	h.PDF(rr, req, id)
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "data-pdf-root") {
+		t.Fatalf("página do PDF: %d %.200s", rr.Code, rr.Body.String())
+	}
+
+	// EPUB não entra no leitor de PDF.
+	epub := seedLivro(t, s, "Cat/A/Livro.epub", "Livro Ep", "", "Cat", "epub")
+	req = httptest.NewRequest(http.MethodGet, "/livros/"+itoa64(epub)+"/pdf", nil)
+	req.SetPathValue("id", itoa64(epub))
+	rr = httptest.NewRecorder()
+	h.PDF(rr, req, epub)
+	if rr.Code != http.StatusSeeOther {
+		t.Errorf("EPUB deveria voltar para a página do livro: %d", rr.Code)
+	}
+
+	// Progresso do PDF exige total e grava página/percentual.
+	corpo := strings.NewReader(`{"cap":29,"ratio":0,"total":120}`)
+	req = httptest.NewRequest(http.MethodPost, "/livros/"+itoa64(id)+"/progresso", corpo)
+	req.Header.Set("Content-Type", "application/json")
+	rr = httptest.NewRecorder()
+	h.Progress(rr, req, id)
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"percent":25`) {
+		t.Fatalf("progresso do PDF: %d %.200s", rr.Code, rr.Body.String())
+	}
+	livro, _ := s.GetBook(id)
+	if livro.PdfPages != 120 {
+		t.Errorf("PdfPages = %d, want 120", livro.PdfPages)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/livros/"+itoa64(id)+"/progresso", strings.NewReader(`{"cap":3}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr = httptest.NewRecorder()
+	h.Progress(rr, req, id)
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Errorf("sem total deveria ser 422: %d", rr.Code)
+	}
+}
+
 func TestReader_SearchReturnsHits(t *testing.T) {
 	s := setupTestStore(t)
 	id := seedLivro(t, s, "Cat/A/Livro.epub", "Livro Ep", "", "Cat", "epub")

@@ -281,6 +281,36 @@ func TestStore_LibraryTotals(t *testing.T) {
 	}
 }
 
+func TestStore_SaveProgressPages(t *testing.T) {
+	s := newTestStore(t)
+	id := seedBook(t, s, "Cat/A/Livro.pdf", "Livro PDF", "", "Cat", "pdf")
+
+	progresso, err := s.SaveProgressPages(id, 30, 120)
+	if err != nil {
+		t.Fatalf("SaveProgressPages erro = %v", err)
+	}
+	if progresso.Percent != 25 || progresso.ChapterOrdinal != 29 {
+		t.Errorf("progresso = %+v, want 25%% e página 30 (ordinal 29)", progresso)
+	}
+	livro, err := s.GetBook(id)
+	if err != nil || livro.PdfPages != 120 {
+		t.Errorf("PdfPages = %d err=%v, want 120", livro.PdfPages, err)
+	}
+
+	// Clamp: página além do total vira a última; abaixo de 1 vira a primeira.
+	progresso, err = s.SaveProgressPages(id, 999, 120)
+	if err != nil || progresso.Percent != 100 {
+		t.Errorf("clamp superior: %+v err=%v", progresso, err)
+	}
+	progresso, err = s.SaveProgressPages(id, 0, 120)
+	if err != nil || progresso.ChapterOrdinal != 0 {
+		t.Errorf("clamp inferior: %+v err=%v", progresso, err)
+	}
+	if _, err := s.SaveProgressPages(id, 5, 0); err == nil {
+		t.Error("total 0 deveria falhar")
+	}
+}
+
 func TestStore_FavoritesToggleAndFilter(t *testing.T) {
 	s := newTestStore(t)
 	um := seedBook(t, s, "Cat/A/Um.epub", "Um", "", "Cat", "epub")

@@ -166,13 +166,20 @@ func (h *LibraryHandler) continuarLendo(todos []models.BookListItem) *ContinueRe
 	if total, err := h.store.CountChapters(livro.ID); err == nil {
 		continuar.Total = total
 	}
-	if livro.Format == "epub" {
+	switch {
+	case livro.Format == "epub":
 		continuar.ChapterLabel = "Capítulo " + itoa(int64(continuar.Ordinal)+1)
 		if continuar.Total > 0 {
 			continuar.ChapterLabel = "Capítulo " + itoa(int64(continuar.Ordinal)+1) + " de " + itoa(int64(continuar.Total))
 		}
-	} else {
-		continuar.ChapterLabel = "PDF aberto no navegador"
+	case livro.Format == "pdf" && livro.PdfPages > 0:
+		pagina := continuar.Ordinal + 1
+		if pagina > livro.PdfPages {
+			pagina = livro.PdfPages
+		}
+		continuar.ChapterLabel = "Página " + itoa(int64(pagina)) + " de " + itoa(int64(livro.PdfPages))
+	default:
+		continuar.ChapterLabel = "PDF"
 	}
 	return continuar
 }
@@ -202,6 +209,9 @@ func (h *LibraryHandler) Resume(w http.ResponseWriter, r *http.Request) {
 func resumeTarget(livro models.BookListItem, progresso models.Progress) string {
 	base := "/livros/" + itoa(livro.ID)
 	if livro.Format != "epub" {
+		if livro.Format == "pdf" {
+			return base + "/pdf"
+		}
 		return base
 	}
 	ordinal := progresso.ChapterOrdinal

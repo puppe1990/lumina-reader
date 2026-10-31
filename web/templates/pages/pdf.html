@@ -1,0 +1,95 @@
+{{ define "content" }}
+<script src="/static/vendor/pdfjs/pdf.min.js"></script>
+<script src="/static/js/pdf-reader.js" defer></script>
+<div class="leitor-root" data-pdf-root data-book="{{ .Book.ID }}" data-page="{{ .Page }}" data-total="{{ .TotalPages }}">
+  <div class="mx-auto w-full max-w-3xl px-4 pt-3">
+    <div class="flex items-center justify-between gap-2 rounded-xl bg-surface-container-low/90 px-2 py-1.5 shadow-sm backdrop-blur-md">
+      <div class="flex min-w-0 items-center gap-1">
+        <a href="/livros/{{ .Book.ID }}" data-amarra-skip aria-label="Voltar para o livro" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-on-surface transition-colors hover:bg-surface-container">
+          <span class="material-symbols-outlined text-[20px]">arrow_back</span>
+        </a>
+        <div class="min-w-0 pr-1">
+          <span class="block truncate text-[10px] uppercase tracking-widest text-on-surface-variant">{{ .Book.Title }}</span>
+          <span id="pdf-pagina" class="block truncate font-serif text-[17px] font-semibold leading-6 text-on-surface">Página {{ .Page }}</span>
+        </div>
+      </div>
+      <div class="flex shrink-0 items-center gap-0.5">
+        <button type="button" data-marcador aria-pressed="false" aria-label="Marcador de página" class="flex h-10 w-10 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container">
+          <span class="material-symbols-outlined text-[20px]" id="pdf-marcador-icone">bookmark_border</span>
+        </button>
+        <span class="contents" amarra-hook="dialog">
+          <button type="button" data-amarra-dialog-open aria-label="Buscar no PDF" class="flex h-10 w-10 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface">
+            <span class="material-symbols-outlined text-[20px]">search</span>
+          </button>
+          <dialog data-amarra-dialog-target id="dlg-busca" class="m-auto w-[min(92vw,28rem)] max-h-[82vh] rounded-2xl bg-surface p-0 text-on-surface shadow-xl backdrop:bg-black/25 backdrop:backdrop-blur-sm">
+            <div class="flex flex-col gap-3 p-4">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold">Buscar no PDF</span>
+                <button type="button" data-amarra-dialog-close class="flex h-7 w-7 items-center justify-center rounded-full bg-surface-container text-on-surface-variant hover:text-on-surface" aria-label="Fechar">
+                  <span class="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              </div>
+              <input id="busca-termo" type="search" placeholder="Palavra ou trecho…" autocomplete="off" class="w-full rounded-xl border border-outline-variant/60 bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none placeholder:text-secondary/70 focus:border-primary" />
+              <p id="busca-status" class="text-[11px] text-secondary"></p>
+              <ol id="busca-hits" class="flex max-h-[52vh] flex-col gap-1 overflow-y-auto pb-1"></ol>
+            </div>
+          </dialog>
+        </span>
+        <span class="contents" amarra-hook="dialog">
+          <button type="button" data-amarra-dialog-open aria-label="Tema de leitura" class="flex h-10 w-10 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface">
+            <span class="material-symbols-outlined text-[20px]">format_size</span>
+          </button>
+          <dialog data-amarra-dialog-target id="dlg-tipografia" class="m-auto w-[min(92vw,24rem)] rounded-2xl bg-surface p-0 text-on-surface shadow-xl backdrop:bg-black/25 backdrop:backdrop-blur-sm">
+            <div class="flex flex-col gap-4 p-5">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold">Tema do PDF</span>
+                <button type="button" data-amarra-dialog-close class="flex h-7 w-7 items-center justify-center rounded-full bg-surface-container text-on-surface-variant hover:text-on-surface" aria-label="Fechar">
+                  <span class="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              </div>
+              <div class="grid grid-cols-4 gap-2">
+                <button type="button" data-canvas-opcao="claro" class="flex flex-col items-center gap-1 rounded-xl bg-white p-2 shadow-sm">
+                  <span class="h-4 w-4 rounded-full bg-[#fdfcfa] shadow ring-1 ring-black/10"></span>
+                  <span class="text-[10px] font-medium text-[#1c1b1b]">Claro</span>
+                </button>
+                <button type="button" data-canvas-opcao="sepia" class="flex flex-col items-center gap-1 rounded-xl bg-[#fbf0d9] p-2 shadow-sm">
+                  <span class="h-4 w-4 rounded-full bg-[#f3e5c8] shadow"></span>
+                  <span class="text-[10px] font-medium text-[#4a3a22]">Sépia</span>
+                </button>
+                <button type="button" data-canvas-opcao="crepusculo" class="flex flex-col items-center gap-1 rounded-xl bg-[#e9e4da] p-2 shadow-sm">
+                  <span class="h-4 w-4 rounded-full bg-[#d8d2c6] shadow"></span>
+                  <span class="text-[10px] font-medium text-[#37332c]">Crepúsculo</span>
+                </button>
+                <button type="button" data-canvas-opcao="noite" class="flex flex-col items-center gap-1 rounded-xl bg-[#1c1c1e] p-2 shadow-sm">
+                  <span class="h-4 w-4 rounded-full bg-[#3a3a3c] shadow"></span>
+                  <span class="text-[10px] font-medium text-[#d0d0d0]">Noite</span>
+                </button>
+              </div>
+              <p class="text-[10px] leading-4 text-secondary">O modo Noite inverte as cores das páginas do PDF. O progresso sincroniza sozinho.</p>
+            </div>
+          </dialog>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="leitor-canvas" data-canvas="sepia">
+    <div id="pdf-carregando" class="flex flex-col items-center gap-3 px-6 py-24 text-center text-sm text-secondary">
+      <span class="material-symbols-outlined animate-spin text-[28px] text-primary">progress_activity</span>
+      Carregando o PDF do acervo…
+    </div>
+    <div id="pdf-paginas" class="mx-auto flex w-full max-w-3xl flex-col items-center gap-4 px-3 py-6"></div>
+  </div>
+
+  <footer class="leitor-progresso mx-auto w-full max-w-2xl px-6 pb-4 pt-2 select-none">
+    <div class="h-[3px] w-full overflow-hidden rounded-full bg-secondary-container/60">
+      <div id="pdf-barra" class="h-full rounded-full bg-primary/70" style="width: {{ .Percent }}%"></div>
+    </div>
+    <div class="mt-1.5 flex items-center justify-between text-[10px] text-on-secondary-container">
+      <span id="pdf-posicao">Página {{ .Page }}{{ if .TotalPages }} de {{ .TotalPages }}{{ end }}</span>
+      <span id="pdf-percentual" class="font-semibold text-primary">{{ .Percent }}% concluído</span>
+      <span>PDF</span>
+    </div>
+  </footer>
+</div>
+{{ end }}

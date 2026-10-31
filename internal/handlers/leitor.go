@@ -121,6 +121,47 @@ func (h *ReaderHandler) Chapter(w http.ResponseWriter, r *http.Request, bookID i
 	}), 0)
 }
 
+// PDF serve o leitor de PDF (pdf.js): a página é a unidade de leitura, então o
+// progresso reusa chapter_ordinal como página-1.
+func (h *ReaderHandler) PDF(w http.ResponseWriter, r *http.Request, bookID int64) {
+	book, err := h.store.GetBook(bookID)
+	if err != nil {
+		h.notFound(w, r)
+		return
+	}
+	if book.Format != "pdf" {
+		http.Redirect(w, r, "/livros/"+itoa(bookID), http.StatusSeeOther)
+		return
+	}
+
+	progresso, temProgresso, err := h.store.ProgressFor(bookID)
+	if err != nil {
+		h.notFound(w, r)
+		return
+	}
+	pagina := 1
+	percent := 0.0
+	if temProgresso {
+		pagina = progresso.ChapterOrdinal + 1
+		percent = progresso.Percent
+		if progresso.BookmarkOrdinal != nil {
+			pagina = *progresso.BookmarkOrdinal + 1
+		}
+	}
+	if livro, err := h.store.GetBook(bookID); err == nil {
+		book = livro // recarrega para pegar pdf_pages atualizado
+	}
+
+	writeView(w, r, h.views, h.cfg, "app", "pdf", amarraData(r, h.site, map[string]any{
+		"Title":      book.Title,
+		"ActiveNav":  "lendo",
+		"Book":       book,
+		"Page":       pagina,
+		"Percent":    int(percent + 0.5),
+		"TotalPages": book.PdfPages,
+	}), 0)
+}
+
 // Search procura o termo no texto do livro e devolve trechos em JSON — o
 // diálogo de busca do leitor consome esse endpoint.
 func (h *ReaderHandler) Search(w http.ResponseWriter, r *http.Request, bookID int64) {
@@ -165,6 +206,28 @@ func (h *ReaderHandler) Progress(w http.ResponseWriter, r *http.Request, bookID 
 	if err != nil {
 		ratio = 0
 	}
+
+	// PDF manda o total de páginas junto: a página vira a unidade de progresso.
+	book, err := h.store.GetBook(bookID)
+	if err != nil {
+		respondJSON(w, http.StatusNotFound, map[string]any{"ok": false, "erro": "livro não encontrado"})
+		return
+	}
+	if book.Format == "pdf" {
+		total, err := strconv.Atoi(strings.TrimSpace(r.FormValue("total")))
+		if err != nil || total < 1 {
+			respondJSON(w, http.StatusUnprocessableEntity, map[string]any{"ok": false, "erro": "total de páginas ausente"})
+			return
+		}
+		progresso, err := h.store.SaveProgressPages(bookID, ordinal+1, total)
+		if err != nil {
+			respondJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "erro": err.Error()})
+			return
+		}
+		respondJSON(w, http.StatusOK, map[string]any{"ok": true, "percent": progresso.Percent})
+		return
+	}
+
 	progresso, err := h.store.SaveProgress(bookID, ordinal, ratio)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "erro": err.Error()})

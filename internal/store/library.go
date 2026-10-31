@@ -20,7 +20,7 @@ type BookFilter struct {
 	Search   string
 }
 
-const bookColumns = `b.id, b.remote_key, b.title, b.author, b.category, b.format, b.size_bytes, b.sha1, b.added_at`
+const bookColumns = `b.id, b.remote_key, b.title, b.author, b.category, b.format, b.size_bytes, b.sha1, b.pdf_pages, b.added_at`
 
 // UpsertBook insere ou atualiza os metadados derivados do caminho remoto e
 // informa se o livro é novo (o relatório de sincronização conta os dois casos).
@@ -70,7 +70,7 @@ func (s *SQLiteStore) GetBook(id int64) (models.Book, error) {
 
 func scanBook(row interface{ Scan(...any) error }) (models.Book, error) {
 	var b models.Book
-	err := row.Scan(&b.ID, &b.RemoteKey, &b.Title, &b.Author, &b.Category, &b.Format, &b.SizeBytes, &b.SHA1, &b.AddedAt)
+	err := row.Scan(&b.ID, &b.RemoteKey, &b.Title, &b.Author, &b.Category, &b.Format, &b.SizeBytes, &b.SHA1, &b.PdfPages, &b.AddedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return models.Book{}, ErrBookNotFound
 	}
@@ -128,7 +128,7 @@ func (s *SQLiteStore) ListBooks(filter BookFilter) ([]models.BookListItem, error
 		var adicionadoEm time.Time
 		if err := rows.Scan(
 			&item.ID, &item.RemoteKey, &item.Title, &item.Author, &item.Category,
-			&item.Format, &item.SizeBytes, &item.SHA1, &item.AddedAt,
+			&item.Format, &item.SizeBytes, &item.SHA1, &item.PdfPages, &item.AddedAt,
 			&percent, &progressoEm, &adicionadoEm, &item.Tone, &item.Favorite,
 		); err != nil {
 			return nil, fmt.Errorf("ler linha de livro: %w", err)
@@ -220,6 +220,38 @@ func (s *SQLiteStore) IsFavorite(bookID int64) (bool, error) {
 		return false, fmt.Errorf("ler favorito do livro %d: %w", bookID, err)
 	}
 	return total > 0, nil
+}
+
+// SaveProgressPages grava a posição de um PDF (página como "capítulo"),
+// persiste o total de páginas no livro e calcula o percentual.
+func (s *SQLiteStore) SaveProgressPages(bookID int64, page, total int) (models.Progress, error) {
+	if total <= 0 {
+		return models.Progress{}, fmt.Errorf("total de páginas inválido para o livro %d: %d", bookID, total)
+	}
+	if page < 1 {
+		page = 1
+	}
+	if page > total {
+		page = total
+	}
+	if _, err := s.db.Exec("UPDATE books SET pdf_pages = ? WHERE id = ?", total, bookID); err != nil {
+		return models.Progress{}, fmt.Errorf("salvar total de páginas do livro %d: %w", bookID, err)
+	}
+	percent := clampPercent(float64(page) / float64(total) * 100)
+	_, err := s.db.Exec(
+		`INSERT INTO reading_progress (book_id, chapter_ordinal, scroll_ratio, percent, updated_at)
+		 VALUES (?, ?, 0, ?, CURRENT_TIMESTAMP)
+		 ON CONFLICT(book_id) DO UPDATE SET
+		   chapter_ordinal = excluded.chapter_ordinal,
+		   scroll_ratio = 0,
+		   percent = excluded.percent,
+		   updated_at = CURRENT_TIMESTAMP`,
+		bookID, page-1, percent,
+	)
+	if err != nil {
+		return models.Progress{}, fmt.Errorf("salvar progresso do PDF %d: %w", bookID, err)
+	}
+	return models.Progress{BookID: bookID, ChapterOrdinal: page - 1, Percent: percent}, nil
 }
 
 // SaveChapters substitui os capítulos do livro (idempotente: rodar de novo

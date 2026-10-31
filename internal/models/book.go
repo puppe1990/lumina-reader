@@ -13,7 +13,10 @@ type Book struct {
 	Format    string
 	SizeBytes int64
 	SHA1      string
-	AddedAt   time.Time
+	// PdfPages é o total de páginas descoberto na primeira abertura do PDF
+	// (0 até então); o percentual do PDF usa página/total.
+	PdfPages int
+	AddedAt  time.Time
 }
 
 // Chapter é um item da spine do EPUB já sanitizado, com o HTML pronto para o

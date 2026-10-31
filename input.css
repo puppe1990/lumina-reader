@@ -594,6 +594,18 @@
     filter: brightness(0.85);
   }
 
+  /* Leitor de PDF (pdf.js): páginas em papel branco; no tema Noite a arte é
+     invertida para não ofuscar. */
+  .pdf-pagina {
+    background-color: #fff;
+  }
+  html[data-canvas="noite"] .pdf-pagina canvas {
+    filter: invert(1) hue-rotate(180deg);
+  }
+  html[data-canvas="noite"] .pdf-pagina {
+    background-color: #1c1c1e;
+  }
+
   /* Destaques: mesmas cores na barra de seleção, no texto e no caderno. */
   mark.nota {
     background: rgba(255, 174, 66, 0.32);

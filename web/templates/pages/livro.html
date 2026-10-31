@@ -42,9 +42,13 @@
           <span class="text-sm font-medium">Baixar EPUB</span>
         </a>
         {{ else if eq .Book.Format "pdf" }}
-        <a href="/livros/{{ .Book.ID }}/arquivo" target="_blank" rel="noopener" class="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-on-primary shadow-sm transition-colors hover:bg-primary-container active:scale-[0.98]">
-          <span class="material-symbols-outlined filled text-[18px]">picture_as_pdf</span>
-          <span class="text-sm font-medium">Abrir PDF</span>
+        <a href="/livros/{{ .Book.ID }}/pdf" data-amarra-skip class="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-on-primary shadow-sm transition-colors hover:bg-primary-container active:scale-[0.98]">
+          <span class="material-symbols-outlined filled text-[18px]">auto_stories</span>
+          <span class="text-sm font-medium">{{ if .HasProgress }}Continuar lendo{{ else }}Ler no Lumina{{ end }}</span>
+        </a>
+        <a href="/livros/{{ .Book.ID }}/arquivo" target="_blank" rel="noopener" class="flex items-center gap-2 rounded-xl bg-surface-container-high px-4 py-2.5 text-on-surface transition-colors hover:bg-surface-container-highest">
+          <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+          <span class="text-sm font-medium">Abrir no navegador</span>
         </a>
         <a href="/livros/{{ .Book.ID }}/arquivo?baixar=1" class="flex items-center gap-2 rounded-xl bg-surface-container-high px-4 py-2.5 text-on-surface transition-colors hover:bg-surface-container-highest">
           <span class="material-symbols-outlined text-[18px]">download</span>

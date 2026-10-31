@@ -40,6 +40,7 @@ type Store interface {
 	CountChapters(bookID int64) (int, error)
 
 	SaveProgress(bookID int64, chapterOrdinal int, scrollRatio float64) (models.Progress, error)
+	SaveProgressPages(bookID int64, page, total int) (models.Progress, error)
 	ProgressFor(bookID int64) (models.Progress, bool, error)
 	SetBookmark(bookID int64, chapterOrdinal int) error
 	ClearBookmark(bookID int64) error
