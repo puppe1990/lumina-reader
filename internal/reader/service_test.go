@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/puppe1990/lumina/internal/models"
+	"github.com/puppe1990/lumina-reader/internal/models"
 )
 
 type fakeRemote struct {

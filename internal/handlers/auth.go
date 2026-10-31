@@ -13,7 +13,7 @@ import (
 	"github.com/puppe1990/amarra-cais/pkg/cais/session"
 	"github.com/puppe1990/amarra-cais/pkg/cais/validate"
 
-	"github.com/puppe1990/lumina/internal/store"
+	"github.com/puppe1990/lumina-reader/internal/store"
 )
 
 // AuthHandler é só o portão da estante: login e logout. A biblioteca é pessoal

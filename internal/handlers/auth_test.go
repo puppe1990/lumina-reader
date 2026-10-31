@@ -10,8 +10,8 @@ import (
 	"github.com/puppe1990/amarra-cais/pkg/cais"
 	"github.com/puppe1990/amarra-cais/pkg/cais/session"
 
-	appi18n "github.com/puppe1990/lumina/internal/i18n"
-	"github.com/puppe1990/lumina/internal/store"
+	appi18n "github.com/puppe1990/lumina-reader/internal/i18n"
+	"github.com/puppe1990/lumina-reader/internal/store"
 )
 
 func newAuthHandler(t *testing.T) (*AuthHandler, store.Store) {

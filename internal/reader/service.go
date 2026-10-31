@@ -12,8 +12,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/puppe1990/lumina/internal/epub"
-	"github.com/puppe1990/lumina/internal/models"
+	"github.com/puppe1990/lumina-reader/internal/epub"
+	"github.com/puppe1990/lumina-reader/internal/models"
 )
 
 type Remote interface {

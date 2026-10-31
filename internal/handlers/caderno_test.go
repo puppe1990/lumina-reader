@@ -10,10 +10,10 @@ import (
 
 	"github.com/puppe1990/amarra-cais/pkg/cais"
 
-	"github.com/puppe1990/lumina/internal/library"
-	"github.com/puppe1990/lumina/internal/models"
-	"github.com/puppe1990/lumina/internal/reader"
-	"github.com/puppe1990/lumina/internal/store"
+	"github.com/puppe1990/lumina-reader/internal/library"
+	"github.com/puppe1990/lumina-reader/internal/models"
+	"github.com/puppe1990/lumina-reader/internal/reader"
+	"github.com/puppe1990/lumina-reader/internal/store"
 )
 
 func newBookHandler(t *testing.T, s store.Store) *BookHandler {

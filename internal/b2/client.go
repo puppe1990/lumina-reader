@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/puppe1990/lumina/internal/library"
+	"github.com/puppe1990/lumina-reader/internal/library"
 )
 
 // endpoint é a base da API; authorize pendura /b2api/v2/b2_authorize_account.

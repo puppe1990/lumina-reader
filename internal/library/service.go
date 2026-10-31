@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/puppe1990/lumina/internal/models"
+	"github.com/puppe1990/lumina-reader/internal/models"
 )
 
 // RemoteFile é o recorte do B2 que a sincronização precisa.

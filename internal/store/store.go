@@ -14,7 +14,7 @@ import (
 	"github.com/puppe1990/amarra-cais/pkg/cais/sqllog"
 	_ "modernc.org/sqlite"
 
-	"github.com/puppe1990/lumina/internal/models"
+	"github.com/puppe1990/lumina-reader/internal/models"
 )
 
 var ErrEmailTaken = errors.New("email already registered")

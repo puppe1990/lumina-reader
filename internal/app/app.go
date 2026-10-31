@@ -21,10 +21,10 @@ import (
 	"github.com/puppe1990/amarra-cais/pkg/cais/middleware"
 	"github.com/puppe1990/amarra-cais/pkg/cais/netutil"
 
-	"github.com/puppe1990/lumina/internal/handlers"
-	appi18n "github.com/puppe1990/lumina/internal/i18n"
-	"github.com/puppe1990/lumina/internal/reader"
-	"github.com/puppe1990/lumina/internal/store"
+	"github.com/puppe1990/lumina-reader/internal/handlers"
+	appi18n "github.com/puppe1990/lumina-reader/internal/i18n"
+	"github.com/puppe1990/lumina-reader/internal/reader"
+	"github.com/puppe1990/lumina-reader/internal/store"
 )
 
 type Deps struct {

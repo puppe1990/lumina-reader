@@ -7,7 +7,7 @@ import (
 
 	"github.com/puppe1990/amarra-cais/pkg/cais/fakedata"
 
-	"github.com/puppe1990/lumina/internal/models"
+	"github.com/puppe1990/lumina-reader/internal/models"
 )
 
 type fakeLister struct {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/puppe1990/amarra-cais/pkg/cais/i18n"
 
-	appi18n "github.com/puppe1990/lumina/internal/i18n"
+	appi18n "github.com/puppe1990/lumina-reader/internal/i18n"
 )
 
 func appCatalog() *i18n.Catalog { return appi18n.DefaultCatalog() }

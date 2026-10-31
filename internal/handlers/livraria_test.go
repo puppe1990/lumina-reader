@@ -8,8 +8,8 @@ import (
 
 	"github.com/puppe1990/amarra-cais/pkg/cais"
 
-	"github.com/puppe1990/lumina/internal/models"
-	"github.com/puppe1990/lumina/internal/store"
+	"github.com/puppe1990/lumina-reader/internal/models"
+	"github.com/puppe1990/lumina-reader/internal/store"
 )
 
 func seedLivro(t *testing.T, s store.Store, key, titulo, autor, category, format string) int64 {

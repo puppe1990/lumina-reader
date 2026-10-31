@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/puppe1990/lumina/internal/models"
+	"github.com/puppe1990/lumina-reader/internal/models"
 )
 
 func seedBook(t *testing.T, s *SQLiteStore, key, titulo, autor, category, format string) int64 {

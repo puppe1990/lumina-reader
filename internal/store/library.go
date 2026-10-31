@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/puppe1990/lumina/internal/models"
+	"github.com/puppe1990/lumina-reader/internal/models"
 )
 
 var ErrBookNotFound = errors.New("livro não encontrado")

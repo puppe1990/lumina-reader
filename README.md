@@ -2,7 +2,7 @@
 
 Leitor editorial do acervo pessoal em [Amarra](https://github.com/puppe1990/amarra-cais): a estante espelha um balde privado do Backblaze B2, os EPUBs são baixados e convertidos em capítulos limpos na primeira abertura, e a leitura acontece na página — temas (claro/sépia/crepúsculo/noite), tipografia ajustável, progresso salvo, destaques e caderno de notas.
 
-Live: https://lumina.apps.gestaobem.com
+Live: https://lumina-reader.apps.gestaobem.com
 
 ## O que ele faz
 

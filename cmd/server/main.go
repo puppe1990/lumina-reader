@@ -20,13 +20,13 @@ import (
 	"github.com/puppe1990/amarra-cais/pkg/cais/meta"
 	"github.com/puppe1990/amarra-cais/pkg/cais/session"
 
-	"github.com/puppe1990/lumina/internal/app"
-	"github.com/puppe1990/lumina/internal/b2"
-	appi18n "github.com/puppe1990/lumina/internal/i18n"
-	"github.com/puppe1990/lumina/internal/library"
-	"github.com/puppe1990/lumina/internal/reader"
-	"github.com/puppe1990/lumina/internal/store"
-	"github.com/puppe1990/lumina/web"
+	"github.com/puppe1990/lumina-reader/internal/app"
+	"github.com/puppe1990/lumina-reader/internal/b2"
+	appi18n "github.com/puppe1990/lumina-reader/internal/i18n"
+	"github.com/puppe1990/lumina-reader/internal/library"
+	"github.com/puppe1990/lumina-reader/internal/reader"
+	"github.com/puppe1990/lumina-reader/internal/store"
+	"github.com/puppe1990/lumina-reader/web"
 )
 
 func main() {

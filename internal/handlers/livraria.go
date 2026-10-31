@@ -10,8 +10,8 @@ import (
 	"github.com/puppe1990/amarra-cais/pkg/cais/i18n"
 	"github.com/puppe1990/amarra-cais/pkg/cais/meta"
 
-	"github.com/puppe1990/lumina/internal/models"
-	"github.com/puppe1990/lumina/internal/store"
+	"github.com/puppe1990/lumina-reader/internal/models"
+	"github.com/puppe1990/lumina-reader/internal/store"
 )
 
 // fusoBRT fixa o dia de leitura na hora de São Paulo: o servidor roda em UTC e

@@ -7,7 +7,7 @@ import (
 	"github.com/puppe1990/amarra-cais/pkg/cais"
 	"github.com/puppe1990/amarra-cais/pkg/cais/middleware"
 
-	"github.com/puppe1990/lumina/internal/handlers"
+	"github.com/puppe1990/lumina-reader/internal/handlers"
 )
 
 func registerRoutes(r *cais.Router, deps Deps, cfg cais.Config) {
