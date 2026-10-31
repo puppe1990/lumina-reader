@@ -72,8 +72,13 @@
         <span class="rounded-full bg-surface-container-highest px-2 py-0.5 text-[11px] text-secondary">{{ .ChapterLabel }}</span>
       </div>
       <div class="flex items-start gap-4">
-        <div class="h-36 w-24 shrink-0 overflow-hidden rounded shadow-md">
-          {{ template "capa" (dict "titulo" .Book.Title "autor" .Book.Author "tom" .Book.Tone "id" .Book.ID "sha1" .Book.SHA1) }}
+        <div class="relative h-36 w-24 shrink-0">
+          <div class="h-full w-full overflow-hidden rounded shadow-md">
+            {{ template "capa" (dict "titulo" .Book.Title "autor" .Book.Author "tom" .Book.Tone "id" .Book.ID "sha1" .Book.SHA1) }}
+          </div>
+          <button type="button" data-fav="{{ .Book.ID }}" aria-pressed="{{ .Book.Favorite }}" aria-label="{{ if .Book.Favorite }}Remover dos favoritos{{ else }}Favoritar{{ end }}" class="absolute left-1.5 top-1.5 z-[3] flex h-7 w-7 items-center justify-center rounded-full bg-surface/85 shadow backdrop-blur-sm transition-colors hover:text-primary {{ if .Book.Favorite }}text-primary{{ else }}text-on-surface-variant{{ end }}">
+            <span class="material-symbols-outlined text-[16px]" {{ if .Book.Favorite }}style="font-variation-settings:'FILL' 1"{{ end }}>favorite</span>
+          </button>
         </div>
         <div class="flex min-w-0 flex-1 flex-col justify-between gap-3 self-stretch">
           <div class="min-w-0">
