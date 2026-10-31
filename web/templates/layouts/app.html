@@ -25,14 +25,19 @@
       // página crua. Máx. 3 tentativas por sessão para não virar loop.
       (function () {
         function folhaAplicada() {
+          // Sinal mais confiável: o body recebe bg-surface pelo Tailwind.
+          var fundo = getComputedStyle(document.body).backgroundColor;
+          if (fundo && fundo !== "rgba(0, 0, 0, 0)" && fundo !== "transparent") return true;
           var folhas = document.styleSheets;
           for (var i = 0; i < folhas.length; i++) {
             var href = folhas[i].href || "";
             if (href.indexOf("/static/css/styles.css") === -1) continue;
             try {
+              // Folha nossa que falhou no fetch lança SecurityError aqui no
+              // Chrome (não devolve lista vazia) — exceção = não carregou.
               return folhas[i].cssRules.length > 50;
             } catch (e) {
-              return true; // mesma origem: exceção aqui significa que carregou
+              return false;
             }
           }
           return false;
