@@ -86,7 +86,16 @@
     var agulha = normalizar(excerpt);
     if (agulha.length < 3) return null;
     var indice = indiceDeTexto(raiz);
-    var pos = indice.texto.indexOf(agulha);
+    // Busca case-insensitive (termo de busca vs. texto do livro); se a
+    // minúscula mudar o comprimento, cai na comparação exata para não
+    // desalinhar o mapa de offsets.
+    var pos = -1;
+    var textoBaixo = indice.texto.toLowerCase();
+    if (textoBaixo.length === indice.texto.length) {
+      pos = textoBaixo.indexOf(agulha.toLowerCase());
+    } else {
+      pos = indice.texto.indexOf(agulha);
+    }
     if (pos < 0) return null;
     var inicio = indice.mapa[pos];
     var fim = indice.mapa[pos + agulha.length - 1];
@@ -278,6 +287,75 @@
       }, 120);
     }
 
+    // busca dentro do livro: termo vindo de ?busca= ganha destaque ao chegar.
+    var termoNaPagina = new URLSearchParams(location.search).get("busca");
+    if (termoNaPagina) {
+      var marcaBusca = destacarTrecho(artigo, termoNaPagina, "busca", null);
+      if (marcaBusca) {
+        setTimeout(function () {
+          marcaBusca.scrollIntoView({ block: "center" });
+        }, 150);
+      }
+    }
+
+    // diálogo de busca no texto (GET /livros/{id}/busca)
+    var campoBusca = document.getElementById("busca-termo");
+    if (campoBusca) {
+      var statusBusca = document.getElementById("busca-status");
+      var listaBusca = document.getElementById("busca-hits");
+      var timerBusca = null;
+
+      var executarBusca = function () {
+        var termo = campoBusca.value.trim();
+        if (termo.length < 2) {
+          listaBusca.innerHTML = "";
+          statusBusca.textContent = termo ? "Digite pelo menos 2 letras." : "";
+          return;
+        }
+        statusBusca.textContent = "Buscando…";
+        fetch("/livros/" + livroId + "/busca?q=" + encodeURIComponent(termo))
+          .then(function (resposta) {
+            return resposta.json();
+          })
+          .then(function (dados) {
+            var hits = (dados && dados.hits) || [];
+            listaBusca.innerHTML = "";
+            statusBusca.textContent = hits.length ? hits.length + " trecho(s) encontrados" : "Nada encontrado neste livro.";
+            hits.forEach(function (hit) {
+              var item = document.createElement("li");
+              var link = document.createElement("a");
+              link.href = "/livros/" + livroId + "/cap/" + hit.ChapterOrdinal + "?busca=" + encodeURIComponent(termo);
+              link.className = "block rounded-lg px-3 py-2 transition-colors hover:bg-surface-container-low";
+              var titulo = document.createElement("span");
+              titulo.className = "block text-[10px] font-semibold uppercase tracking-wider text-primary";
+              titulo.textContent = "Cap. " + (hit.ChapterOrdinal + 1) + " · " + hit.ChapterTitle;
+              var trecho = document.createElement("span");
+              trecho.className = "mt-0.5 block text-[13px] leading-5 text-on-surface";
+              trecho.appendChild(trechoComMarca(hit.Snippet, termo));
+              link.appendChild(titulo);
+              link.appendChild(trecho);
+              item.appendChild(link);
+              listaBusca.appendChild(item);
+            });
+          })
+          .catch(function () {
+            statusBusca.textContent = "Falha na busca — tente de novo.";
+          });
+      };
+
+      campoBusca.addEventListener("input", function () {
+        clearTimeout(timerBusca);
+        timerBusca = setTimeout(executarBusca, 350);
+      });
+      campoBusca.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          clearTimeout(timerBusca);
+          executarBusca();
+        }
+      });
+    }
+
     // seleção → barra de destaque --------------------------------------------
     var barra = document.getElementById("barra-selecao");
     var selecaoAtual = null;
@@ -380,6 +458,30 @@
     true
   );
   document.addEventListener("amarra:morphed", limparCapasQuebradas);
+
+  // Fragment com o termo da busca realçado dentro do snippet (texto puro +
+  // <mark>, sem innerHTML).
+  function trechoComMarca(texto, termo) {
+    var frag = document.createDocumentFragment();
+    var baixo = texto.toLowerCase();
+    var alvo = termo.toLowerCase();
+    if (!alvo) {
+      frag.appendChild(document.createTextNode(texto));
+      return frag;
+    }
+    var i = 0;
+    var pos;
+    while ((pos = baixo.indexOf(alvo, i)) >= 0) {
+      if (pos > i) frag.appendChild(document.createTextNode(texto.slice(i, pos)));
+      var marca = document.createElement("mark");
+      marca.className = "busca-termo";
+      marca.textContent = texto.slice(pos, pos + alvo.length);
+      frag.appendChild(marca);
+      i = pos + alvo.length;
+    }
+    if (i < texto.length) frag.appendChild(document.createTextNode(texto.slice(i)));
+    return frag;
+  }
 
   function iniciar() {
     limparCapasQuebradas();

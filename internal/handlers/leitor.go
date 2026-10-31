@@ -121,6 +121,28 @@ func (h *ReaderHandler) Chapter(w http.ResponseWriter, r *http.Request, bookID i
 	}), 0)
 }
 
+// Search procura o termo no texto do livro e devolve trechos em JSON — o
+// diálogo de busca do leitor consome esse endpoint.
+func (h *ReaderHandler) Search(w http.ResponseWriter, r *http.Request, bookID int64) {
+	book, err := h.store.GetBook(bookID)
+	if err != nil {
+		respondJSON(w, http.StatusNotFound, map[string]any{"ok": false, "erro": "livro não encontrado"})
+		return
+	}
+	termo := strings.TrimSpace(r.URL.Query().Get("q"))
+	if book.Format != "epub" || len([]rune(termo)) < 2 {
+		respondJSON(w, http.StatusOK, map[string]any{"ok": true, "hits": []any{}})
+		return
+	}
+	capitulos, err := h.leitor.Chapters(r.Context(), book)
+	if err != nil {
+		respondJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "erro": "não consegui preparar o livro"})
+		return
+	}
+	hits := reader.BuscarNoTexto(termo, capitulos, 3, 40)
+	respondJSON(w, http.StatusOK, map[string]any{"ok": true, "hits": hits})
+}
+
 func (h *ReaderHandler) notFound(w http.ResponseWriter, r *http.Request) {
 	writeView(w, r, h.views, h.cfg, "app", "404", amarraData(r, h.site, map[string]any{
 		"Title": "Não encontrado",

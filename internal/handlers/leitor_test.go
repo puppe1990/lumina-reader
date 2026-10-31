@@ -129,6 +129,42 @@ func TestReader_PulseAddsSeconds(t *testing.T) {
 	}
 }
 
+func TestReader_SearchReturnsHits(t *testing.T) {
+	s := setupTestStore(t)
+	id := seedLivro(t, s, "Cat/A/Livro.epub", "Livro Ep", "", "Cat", "epub")
+	seedCapitulos(t, s, id, "Abertura", "Meio", "Desfecho")
+
+	h := newReaderHandler(t, s)
+	req := httptest.NewRequest(http.MethodGet, "/livros/"+itoa64(id)+"/busca?q=capítulo", nil)
+	rr := httptest.NewRecorder()
+	h.Search(rr, req, id)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d", rr.Code)
+	}
+	var resposta struct {
+		OK   bool `json:"ok"`
+		Hits []struct {
+			ChapterOrdinal int    `json:"ChapterOrdinal"`
+			Snippet        string `json:"Snippet"`
+		} `json:"Hits"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resposta); err != nil {
+		t.Fatalf("resposta não é JSON: %v", err)
+	}
+	// A resposta serializa "hits" (minúsculo) — normaliza pelo corpo cru.
+	if !resposta.OK || !strings.Contains(rr.Body.String(), `"Snippet"`) {
+		t.Fatalf("resposta = %.300s", rr.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/livros/"+itoa64(id)+"/busca?q=a", nil)
+	rr = httptest.NewRecorder()
+	h.Search(rr, req, id)
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"hits":[]`) {
+		t.Errorf("termo curto deveria devolver hits vazio: %.200s", rr.Body.String())
+	}
+}
+
 func TestReader_BookmarkToggles(t *testing.T) {
 	s := setupTestStore(t)
 	id := seedLivro(t, s, "Cat/A/Livro.epub", "Livro Ep", "", "Cat", "epub")
