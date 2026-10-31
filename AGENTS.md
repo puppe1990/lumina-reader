@@ -6,16 +6,18 @@ Primary reader is often an LLM agent. Prefer small greps, small modules, and hea
 
 Leitor editorial do acervo B2 (`ebooks-macbook-air-puppe`). Mapa curto:
 
-| Path                               | Papel                                                                                                                                           |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `internal/b2/`                     | API nativa do B2 (autorizar/listar/baixar); testes usam `httptest`, nunca a rede real                                                           |
-| `internal/library/`                | `Describe` deriva título/autor/categoria da key; `Service.Sync` espelha o balde (ignora `Documentos Pessoais/`)                                 |
-| `internal/epub/`                   | parser EPUB (container/OPF/spine/nav) + bluemonday; imagens viram `/livros/{id}/recurso/...`                                                    |
-| `internal/reader/`                 | cache em disco por SHA1 + capítulos no SQLite; parse só na primeira abertura                                                                    |
-| `internal/store/`                  | tabelas `books`, `book_chapters`, `reading_progress`, `book_notes`, `reading_days`                                                              |
-| `internal/handlers/`               | biblioteca, livro (detalhe/arquivo/recurso), leitor (capítulo/progresso/pulso/marcador), caderno, coleções, busca, sincronizar                  |
-| `web/static/js/lumina.js`          | hidrata o leitor: tema/tamanho (localStorage), posição, pulso, seleção → destaque, realce de notas                                              |
-| `web/templates/partials/capa.html` | capa tipográfica; tom 0..5 vem de `b.id % 6` no SQL — classes `capa-tom-*` e `nota-*` são montadas no runtime e vivem no `safelist` do Tailwind |
+| Path                               | Papel                                                                                                                                                                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `internal/b2/`                     | API nativa do B2 (autorizar/listar/baixar); testes usam `httptest`, nunca a rede real                                                                                                                                                                   |
+| `internal/library/`                | `Describe` deriva título/autor/categoria da key; `Service.Sync` espelha o balde (ignora `Documentos Pessoais/`)                                                                                                                                         |
+| `internal/epub/`                   | parser EPUB (container/OPF/spine/nav) + bluemonday; imagens viram `/livros/{id}/recurso/...`                                                                                                                                                            |
+| `internal/reader/`                 | cache em disco por SHA1 + capítulos no SQLite; parse só na primeira abertura                                                                                                                                                                            |
+| `internal/store/`                  | tabelas `books`, `book_chapters`, `reading_progress`, `book_notes`, `reading_days`                                                                                                                                                                      |
+| `internal/handlers/`               | biblioteca, livro (detalhe/arquivo/recurso), leitor (capítulo/progresso/pulso/marcador), caderno, coleções, busca, sincronizar                                                                                                                          |
+| `web/static/js/lumina.js`          | hidrata o leitor: tema/tamanho (localStorage), posição, pulso, seleção → destaque, realce de notas                                                                                                                                                      |
+| `web/templates/partials/capa.html` | capa do livro: arte real (`/livros/{id}/capa`, cacheada em `book_covers`) sobre a capa tipográfica; sem capa o JS remove a `<img>` e o tom + título aparecem. Classes `capa-tom-*` e `nota-*` são montadas no runtime e vivem no `safelist` do Tailwind |
+
+Capas: `epub.Cover` acha a arte (properties=cover-image → meta name=cover → href "cover" → 1ª imagem da spine); `reader.Cover` normaliza para JPEG ≤720×1080 (arte de 4 MB vira ~80 KB) e cacheia; PDF usa `pdftoppm` (poppler-utils instalado pelo `release_command` do `.cleat_deploy/deploy.json`, porque o builder golang do Cleat ignora `runtime_apt_packages`). Sem a ferramenta o 404 não é persistido como "missing".
 
 Regras que não se quebram: o texto do capítulo chega por `template.HTML`/`template.JS` (sanitizado antes), o leitor navega com `data-amarra-skip` (página completa), e o dia de leitura é sempre `hojeBRT` (America/São Paulo fixo em -3). Credenciais B2 só via env (`B2_APPLICATION_KEY_ID`/`B2_APPLICATION_KEY`/`B2_BUCKET`) — nunca commitar.
 
