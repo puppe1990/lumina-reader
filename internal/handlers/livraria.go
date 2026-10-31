@@ -65,7 +65,14 @@ func (h *LibraryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	filtro := r.URL.Query().Get("f")
 	categoria := r.URL.Query().Get("cat")
 
-	livros, err := h.store.ListBooks(store.BookFilter{Status: filtro, Category: categoria})
+	// O chip de formato usa o mesmo ?f= dos chips de status.
+	filtroFormato := ""
+	if filtro == "pdf" || filtro == "epub" {
+		filtroFormato = filtro
+		filtro = ""
+	}
+
+	livros, err := h.store.ListBooks(store.BookFilter{Status: filtro, Format: filtroFormato, Category: categoria})
 	if err != nil {
 		writeView(w, r, h.views, h.cfg, "app", "erro", amarraData(r, h.site, map[string]any{
 			"Title":   "Biblioteca",

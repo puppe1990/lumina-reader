@@ -55,9 +55,12 @@ func TestLibrary_Home_ShowsShelfAndGreeting(t *testing.T) {
 
 func TestLibrary_Home_FilterChipsNarrowTheShelf(t *testing.T) {
 	s := setupTestStore(t)
-	um := seedLivro(t, s, "Cat/A/Um.epub", "Livro Um", "", "Cat", "epub")
+	seedLivro(t, s, "Cat/A/Um.epub", "Livro Um", "", "Cat", "epub")
 	seedLivro(t, s, "Cat/A/Dois.pdf", "Livro Dois", "", "Cat", "pdf")
-	if _, err := s.SaveProgress(um, 0, 0.2); err != nil {
+	// O hero "lendo agora" ignora os filtros; este livro segura o hero para
+	// os asserts da grade falarem só sobre o recorte.
+	lendo := seedLivro(t, s, "Cat/A/Lendo.epub", "Lendo Um", "", "Cat", "epub")
+	if _, err := s.SaveProgress(lendo, 0, 0.2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -67,11 +70,23 @@ func TestLibrary_Home_FilterChipsNarrowTheShelf(t *testing.T) {
 	h.ServeHTTP(rr, req)
 
 	body := rr.Body.String()
-	if !strings.Contains(body, "Livro Um") {
-		t.Errorf("filtro lendo deveria manter Livro Um")
+	if !strings.Contains(body, "Lendo Um") {
+		t.Errorf("filtro lendo deveria manter Lendo Um")
 	}
 	if strings.Contains(body, "Livro Dois") {
 		t.Errorf("filtro lendo não deveria mostrar Livro Dois")
+	}
+
+	// O chip de formato (?f=pdf) filtra por formato, não por status.
+	req = httptest.NewRequest(http.MethodGet, "/?f=pdf", nil)
+	rr = httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	body = rr.Body.String()
+	if !strings.Contains(body, "Livro Dois") {
+		t.Errorf("filtro pdf deveria manter Livro Dois")
+	}
+	if strings.Contains(body, "Livro Um") {
+		t.Errorf("filtro pdf não deveria mostrar Livro Um")
 	}
 }
 
