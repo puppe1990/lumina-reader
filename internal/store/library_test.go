@@ -281,6 +281,53 @@ func TestStore_LibraryTotals(t *testing.T) {
 	}
 }
 
+func TestStore_FavoritesToggleAndFilter(t *testing.T) {
+	s := newTestStore(t)
+	um := seedBook(t, s, "Cat/A/Um.epub", "Um", "", "Cat", "epub")
+	seedBook(t, s, "Cat/A/Dois.epub", "Dois", "", "Cat", "epub")
+
+	favorito, err := s.ToggleFavorite(um)
+	if err != nil || !favorito {
+		t.Fatalf("ToggleFavorite: favorito=%v err=%v", favorito, err)
+	}
+	if ok, err := s.IsFavorite(um); err != nil || !ok {
+		t.Fatalf("IsFavorite = %v err=%v", ok, err)
+	}
+
+	favoritos, err := s.ListBooks(BookFilter{Status: "favoritos"})
+	if err != nil || len(favoritos) != 1 || favoritos[0].Title != "Um" {
+		t.Fatalf("ListBooks(favoritos) = %+v err=%v", favoritos, err)
+	}
+	if !favoritos[0].Favorite {
+		t.Errorf("ListItem.Favorite = false, want true")
+	}
+	todos, _ := s.ListBooks(BookFilter{})
+	for _, livro := range todos {
+		if livro.Title == "Dois" && livro.Favorite {
+			t.Errorf("Dois não deveria estar favoritado")
+		}
+	}
+
+	totais, err := s.LibraryTotals()
+	if err != nil || totais.Favoritos != 1 {
+		t.Errorf("LibraryTotals.Favoritos = %d err=%v, want 1", totais.Favoritos, err)
+	}
+
+	// Toggle de novo remove; upsert (novo sync) preserva o estado.
+	if favorito, err := s.ToggleFavorite(um); err != nil || favorito {
+		t.Fatalf("segundo ToggleFavorite: favorito=%v err=%v (want false)", favorito, err)
+	}
+	if _, err := s.ToggleFavorite(um); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.UpsertBook(models.Book{RemoteKey: "Cat/A/Um.epub", Title: "Um", Category: "Cat", Format: "epub", SHA1: "novo"}); err != nil {
+		t.Fatal(err)
+	}
+	if ok, _ := s.IsFavorite(um); !ok {
+		t.Errorf("sync (UpsertBook) não pode derrubar o favorito")
+	}
+}
+
 func TestStore_CoverLifecycle(t *testing.T) {
 	s := newTestStore(t)
 	id := seedBook(t, s, "Cat/A/Livro.epub", "Livro", "", "Cat", "epub")

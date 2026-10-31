@@ -103,6 +103,7 @@
         <a href="/" class="whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors {{ if and (eq .Filter "") (eq .Category "") }}bg-on-surface text-surface shadow-sm{{ else }}bg-surface-container-high text-on-secondary-container hover:text-on-surface{{ end }}">Todos ({{ .Totals.Total }})</a>
         <a href="/?f=lendo" class="whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors {{ if eq .Filter "lendo" }}bg-on-surface text-surface shadow-sm{{ else }}bg-surface-container-high text-on-secondary-container hover:text-on-surface{{ end }}">Lendo ({{ .Totals.Lendo }})</a>
         <a href="/?f=lidos" class="whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors {{ if eq .Filter "lidos" }}bg-on-surface text-surface shadow-sm{{ else }}bg-surface-container-high text-on-secondary-container hover:text-on-surface{{ end }}">Concluídos ({{ .Totals.Lidos }})</a>
+        <a href="/?f=favoritos" class="whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors {{ if eq .Filter "favoritos" }}bg-on-surface text-surface shadow-sm{{ else }}bg-surface-container-high text-on-secondary-container hover:text-on-surface{{ end }}">Favoritos ({{ .Totals.Favoritos }})</a>
         <a href="/?f=nao_iniciados" class="whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors {{ if eq .Filter "nao_iniciados" }}bg-on-surface text-surface shadow-sm{{ else }}bg-surface-container-high text-on-secondary-container hover:text-on-surface{{ end }}">Na fila</a>
         <a href="/?f=pdf" class="whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors {{ if eq .Filter "pdf" }}bg-on-surface text-surface shadow-sm{{ else }}bg-surface-container-high text-on-secondary-container hover:text-on-surface{{ end }}">PDF ({{ .Totals.Pdfs }})</a>
       </div>
@@ -111,7 +112,7 @@
     <section class="flex flex-col gap-3">
       <div class="flex items-center justify-between">
         <h3 class="font-serif text-lg font-semibold text-on-surface">
-          {{ if .Category }}{{ .Category }}{{ else if eq .Filter "lendo" }}Em andamento{{ else if eq .Filter "nao_iniciados" }}Na fila{{ else if eq .Filter "lidos" }}Concluídos{{ else if eq .Filter "pdf" }}PDFs{{ else }}Recentes na sua estante{{ end }}
+          {{ if .Category }}{{ .Category }}{{ else if eq .Filter "lendo" }}Em andamento{{ else if eq .Filter "favoritos" }}Favoritos{{ else if eq .Filter "nao_iniciados" }}Na fila{{ else if eq .Filter "lidos" }}Concluídos{{ else if eq .Filter "pdf" }}PDFs{{ else }}Recentes na sua estante{{ end }}
         </h3>
         <a href="/colecoes" class="flex items-center text-[13px] font-medium text-primary hover:underline">
           Ver coleções
@@ -122,22 +123,27 @@
       <div class="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
         {{ range .Books }}
         <article class="group flex flex-col gap-2">
-          <a href="/livros/{{ .ID }}" data-amarra-skip class="relative block aspect-[1/1.5] w-full overflow-hidden rounded-lg bg-surface-container-high shadow-md">
-            {{ template "capa" (dict "titulo" .Title "autor" .Author "tom" .Tone "id" .ID "sha1" .SHA1) }}
-            {{ if eq .Format "pdf" }}
-            <span class="absolute right-2 top-2 rounded-full bg-inverse-surface/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-inverse-on-surface">PDF</span>
-            {{ end }}
-            {{ if .HasProgress }}
-            <span class="absolute bottom-2 left-2 right-2 flex items-center justify-between rounded bg-surface/90 px-2 py-1 backdrop-blur-sm">
-              {{ if ge .Percent 95.0 }}
-              <span class="text-[10px] font-semibold text-secondary">Lido</span>
-              <span class="material-symbols-outlined filled text-[13px] text-primary">check_circle</span>
-              {{ else }}
-              <span class="text-[10px] font-semibold text-primary">{{ printf "%.0f" .Percent }}% lido</span>
+          <div class="relative">
+            <a href="/livros/{{ .ID }}" data-amarra-skip class="relative block aspect-[1/1.5] w-full overflow-hidden rounded-lg bg-surface-container-high shadow-md">
+              {{ template "capa" (dict "titulo" .Title "autor" .Author "tom" .Tone "id" .ID "sha1" .SHA1) }}
+              {{ if eq .Format "pdf" }}
+              <span class="absolute right-2 top-2 rounded-full bg-inverse-surface/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-inverse-on-surface">PDF</span>
               {{ end }}
-            </span>
-            {{ end }}
-          </a>
+              {{ if .HasProgress }}
+              <span class="absolute bottom-2 left-2 right-2 flex items-center justify-between rounded bg-surface/90 px-2 py-1 backdrop-blur-sm">
+                {{ if ge .Percent 95.0 }}
+                <span class="text-[10px] font-semibold text-secondary">Lido</span>
+                <span class="material-symbols-outlined filled text-[13px] text-primary">check_circle</span>
+                {{ else }}
+                <span class="text-[10px] font-semibold text-primary">{{ printf "%.0f" .Percent }}% lido</span>
+                {{ end }}
+              </span>
+              {{ end }}
+            </a>
+            <button type="button" data-fav="{{ .ID }}" aria-pressed="{{ .Favorite }}" aria-label="{{ if .Favorite }}Remover dos favoritos{{ else }}Favoritar{{ end }}" class="absolute left-2 top-2 z-[3] flex h-8 w-8 items-center justify-center rounded-full bg-surface/85 shadow backdrop-blur-sm transition-colors hover:text-primary {{ if .Favorite }}text-primary{{ else }}text-on-surface-variant{{ end }}">
+              <span class="material-symbols-outlined text-[18px]" {{ if .Favorite }}style="font-variation-settings:'FILL' 1"{{ end }}>favorite</span>
+            </button>
+          </div>
           <div class="min-w-0">
             <h4 class="truncate text-[15px] font-semibold leading-snug text-on-surface">{{ .Title }}</h4>
             <p class="truncate text-[13px] text-secondary">{{ if .Author }}{{ .Author }}{{ else }}{{ .Category }}{{ end }}</p>

@@ -459,6 +459,49 @@
   );
   document.addEventListener("amarra:morphed", limparCapasQuebradas);
 
+  // Favoritos: coração da estante e da página do livro (POST /livros/{id}/favorito).
+  document.addEventListener("click", function (ev) {
+    var botao = ev.target && ev.target.closest ? ev.target.closest("[data-fav]") : null;
+    if (!botao) return;
+    ev.preventDefault();
+    var livroId = botao.getAttribute("data-fav");
+    var ativo = botao.getAttribute("aria-pressed") !== "true";
+    fetch("/livros/" + livroId + "/favorito", {
+      method: "POST",
+      headers: { "X-CSRF-Token": token() },
+    })
+      .then(function (resposta) {
+        return resposta.json();
+      })
+      .then(function (dados) {
+        var novo = !!(dados && dados.favorito);
+        botao.setAttribute("aria-pressed", novo ? "true" : "false");
+        botao.setAttribute("aria-label", novo ? "Remover dos favoritos" : "Favoritar");
+        botao.classList.toggle("text-primary", novo);
+        botao.classList.toggle("text-on-surface-variant", !novo);
+        botao.classList.toggle("text-on-surface", !novo);
+        var icone = botao.querySelector(".material-symbols-outlined");
+        if (icone) {
+          icone.classList.toggle("filled", novo);
+          icone.style.fontVariationSettings = novo ? "'FILL' 1" : "'FILL' 0";
+        }
+        var rotulo = botao.querySelector("[data-fav-rotulo]");
+        if (rotulo) rotulo.textContent = novo ? "Favoritado" : "Favoritar";
+        var chip = document.querySelector('a[href="/?f=favoritos"]');
+        if (chip) {
+          var numero = chip.textContent.match(/(\d+)/);
+          if (numero) {
+            var total = Math.max(0, parseInt(numero[1], 10) + (novo ? 1 : -1));
+            chip.textContent = "Favoritos (" + total + ")";
+          }
+        }
+        toast(novo ? "Adicionado aos favoritos" : "Removido dos favoritos");
+      })
+      .catch(function () {
+        toast("Não consegui salvar o favorito");
+      });
+  });
+
   // Fragment com o termo da busca realçado dentro do snippet (texto puro +
   // <mark>, sem innerHTML).
   function trechoComMarca(texto, termo) {

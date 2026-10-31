@@ -72,6 +72,34 @@ func TestBook_Show_UnknownReturns404(t *testing.T) {
 	}
 }
 
+func TestBook_FavoriteToggles(t *testing.T) {
+	s := setupTestStore(t)
+	id := seedLivro(t, s, "Cat/A/Fav.epub", "Favorito", "", "Cat", "epub")
+	h := newBookHandler(t, s)
+
+	toggle := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/livros/"+itoa64(id)+"/favorito", nil)
+		rr := httptest.NewRecorder()
+		h.Favorite(rr, req, id)
+		return rr
+	}
+
+	rr := toggle()
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"favorito":true`) {
+		t.Fatalf("primeiro toggle: %d %.200s", rr.Code, rr.Body.String())
+	}
+	if ok, _ := s.IsFavorite(id); !ok {
+		t.Fatal("favorito não persistiu")
+	}
+	rr = toggle()
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"favorito":false`) {
+		t.Fatalf("segundo toggle: %d %.200s", rr.Code, rr.Body.String())
+	}
+	if ok, _ := s.IsFavorite(id); ok {
+		t.Fatal("favorito deveria ter sido removido")
+	}
+}
+
 func TestBook_CoverServesCachedArt(t *testing.T) {
 	s := setupTestStore(t)
 	comCapa := seedLivro(t, s, "Cat/A/Com.epub", "Com Capa", "", "Cat", "epub")

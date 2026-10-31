@@ -83,8 +83,11 @@ func scanBook(row interface{ Scan(...any) error }) (models.Book, error) {
 // ListBooks devolve a estante com o estado de leitura, mais recente primeiro
 // (última leitura ou, sem progresso, quando entrou no banco).
 func (s *SQLiteStore) ListBooks(filter BookFilter) ([]models.BookListItem, error) {
-	consulta := `SELECT ` + bookColumns + `, p.percent, p.updated_at, b.added_at, b.id % 6
-		FROM books b LEFT JOIN reading_progress p ON p.book_id = b.id WHERE 1 = 1`
+	consulta := `SELECT ` + bookColumns + `, p.percent, p.updated_at, b.added_at, b.id % 6, f.book_id IS NOT NULL
+		FROM books b
+		LEFT JOIN reading_progress p ON p.book_id = b.id
+		LEFT JOIN book_favorites f ON f.book_id = b.id
+		WHERE 1 = 1`
 	var args []any
 	if filter.Category != "" {
 		consulta += " AND b.category = ?"
@@ -106,6 +109,8 @@ func (s *SQLiteStore) ListBooks(filter BookFilter) ([]models.BookListItem, error
 		consulta += " AND p.percent >= 95"
 	case "nao_iniciados":
 		consulta += " AND p.book_id IS NULL"
+	case "favoritos":
+		consulta += " AND f.book_id IS NOT NULL"
 	}
 	consulta += " ORDER BY COALESCE(p.updated_at, b.added_at) DESC, b.title COLLATE NOCASE ASC"
 
@@ -124,7 +129,7 @@ func (s *SQLiteStore) ListBooks(filter BookFilter) ([]models.BookListItem, error
 		if err := rows.Scan(
 			&item.ID, &item.RemoteKey, &item.Title, &item.Author, &item.Category,
 			&item.Format, &item.SizeBytes, &item.SHA1, &item.AddedAt,
-			&percent, &progressoEm, &adicionadoEm, &item.Tone,
+			&percent, &progressoEm, &adicionadoEm, &item.Tone, &item.Favorite,
 		); err != nil {
 			return nil, fmt.Errorf("ler linha de livro: %w", err)
 		}
@@ -166,13 +171,55 @@ func (s *SQLiteStore) LibraryTotals() (models.LibraryTotals, error) {
 		        COALESCE(SUM(CASE WHEN b.format = 'epub' THEN 1 ELSE 0 END), 0),
 		        COALESCE(SUM(CASE WHEN b.format = 'pdf' THEN 1 ELSE 0 END), 0),
 		        COALESCE(SUM(CASE WHEN p.book_id IS NOT NULL AND p.percent < 95 THEN 1 ELSE 0 END), 0),
-		        COALESCE(SUM(CASE WHEN p.percent >= 95 THEN 1 ELSE 0 END), 0)
-		 FROM books b LEFT JOIN reading_progress p ON p.book_id = b.id`,
-	).Scan(&totais.Total, &totais.Epubs, &totais.Pdfs, &totais.Lendo, &totais.Lidos)
+		        COALESCE(SUM(CASE WHEN p.percent >= 95 THEN 1 ELSE 0 END), 0),
+		        COALESCE(SUM(CASE WHEN f.book_id IS NOT NULL THEN 1 ELSE 0 END), 0)
+		 FROM books b
+		 LEFT JOIN reading_progress p ON p.book_id = b.id
+		 LEFT JOIN book_favorites f ON f.book_id = b.id`,
+	).Scan(&totais.Total, &totais.Epubs, &totais.Pdfs, &totais.Lendo, &totais.Lidos, &totais.Favoritos)
 	if err != nil {
 		return models.LibraryTotals{}, fmt.Errorf("totais da estante: %w", err)
 	}
 	return totais, nil
+}
+
+// ToggleFavorite liga/desliga o favorito e devolve o estado novo.
+func (s *SQLiteStore) ToggleFavorite(bookID int64) (bool, error) {
+	tx, err := s.db.Raw().Begin()
+	if err != nil {
+		return false, fmt.Errorf("abrir transação de favorito: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var existe int
+	if err := tx.QueryRow("SELECT COUNT(*) FROM book_favorites WHERE book_id = ?", bookID).Scan(&existe); err != nil {
+		return false, fmt.Errorf("ler favorito do livro %d: %w", bookID, err)
+	}
+	if existe > 0 {
+		if _, err := tx.Exec("DELETE FROM book_favorites WHERE book_id = ?", bookID); err != nil {
+			return false, fmt.Errorf("remover favorito do livro %d: %w", bookID, err)
+		}
+		if err := tx.Commit(); err != nil {
+			return false, fmt.Errorf("confirmar remoção do favorito: %w", err)
+		}
+		return false, nil
+	}
+	if _, err := tx.Exec("INSERT INTO book_favorites (book_id) VALUES (?)", bookID); err != nil {
+		return false, fmt.Errorf("favoritar livro %d: %w", bookID, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("confirmar favorito do livro %d: %w", bookID, err)
+	}
+	return true, nil
+}
+
+func (s *SQLiteStore) IsFavorite(bookID int64) (bool, error) {
+	var total int
+	err := s.db.QueryRow("SELECT COUNT(*) FROM book_favorites WHERE book_id = ?", bookID).Scan(&total)
+	if err != nil {
+		return false, fmt.Errorf("ler favorito do livro %d: %w", bookID, err)
+	}
+	return total > 0, nil
 }
 
 // SaveChapters substitui os capítulos do livro (idempotente: rodar de novo

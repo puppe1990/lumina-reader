@@ -1,0 +1,8 @@
+-- up
+CREATE TABLE IF NOT EXISTS book_favorites (
+    book_id INTEGER PRIMARY KEY REFERENCES books(id) ON DELETE CASCADE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- down
+DROP TABLE IF EXISTS book_favorites;

@@ -82,6 +82,7 @@ func (h *BookHandler) Show(w http.ResponseWriter, r *http.Request, id int64) {
 	if temProgresso {
 		continuar = progresso.ChapterOrdinal
 	}
+	favorito, _ := h.store.IsFavorite(book.ID)
 	palavras := 0
 	for _, capitulo := range capitulos {
 		palavras += capitulo.Words
@@ -94,6 +95,7 @@ func (h *BookHandler) Show(w http.ResponseWriter, r *http.Request, id int64) {
 		"Tone":         int(book.ID % 6),
 		"Progress":     progresso,
 		"HasProgress":  temProgresso,
+		"Favorite":     favorito,
 		"Percent":      int(progresso.Percent + 0.5),
 		"Chapters":     capitulos,
 		"Notes":        notas,
@@ -128,6 +130,21 @@ func (h *BookHandler) File(w http.ResponseWriter, r *http.Request, id int64) {
 	if _, err := io.Copy(w, stream); err != nil {
 		return // conexão caiu no meio do streaming; nada além de log implícito
 	}
+}
+
+// Favorite alterna o favorito do livro (o coração da estante e da página do
+// livro usam este endpoint) e devolve o estado novo.
+func (h *BookHandler) Favorite(w http.ResponseWriter, r *http.Request, id int64) {
+	book, ok := h.bookOrNotFound(w, r, id)
+	if !ok {
+		return
+	}
+	favorito, err := h.store.ToggleFavorite(book.ID)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "erro": err.Error()})
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"ok": true, "favorito": favorito})
 }
 
 // Cover serve a arte do livro (capa do EPUB / 1ª página do PDF), cacheada no

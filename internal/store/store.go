@@ -57,6 +57,9 @@ type Store interface {
 	CoverFor(bookID int64) (models.Cover, bool, error)
 	SaveCover(cover models.Cover) error
 
+	ToggleFavorite(bookID int64) (bool, error)
+	IsFavorite(bookID int64) (bool, error)
+
 	Sessions() session.Store
 	Ping() error
 	DB() *sql.DB

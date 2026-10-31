@@ -56,6 +56,7 @@ type BookListItem struct {
 	Book
 	HasProgress bool
 	Percent     float64
+	Favorite    bool
 	UpdatedAt   time.Time
 	// Tone escolhe a lombada tipográfica da capa (0..5); vem do id no SQL para
 	// ser determinística e estável entre renders.
@@ -78,11 +79,12 @@ type Cover struct {
 }
 
 type LibraryTotals struct {
-	Total int
-	Epubs int
-	Pdfs  int
-	Lendo int
-	Lidos int
+	Total     int
+	Epubs     int
+	Pdfs      int
+	Lendo     int
+	Lidos     int
+	Favoritos int
 }
 
 type ReadingStats struct {
