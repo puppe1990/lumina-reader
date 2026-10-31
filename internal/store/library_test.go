@@ -280,3 +280,32 @@ func TestStore_LibraryTotals(t *testing.T) {
 		t.Errorf("LibraryTotals = %+v", totais)
 	}
 }
+
+func TestStore_CoverLifecycle(t *testing.T) {
+	s := newTestStore(t)
+	id := seedBook(t, s, "Cat/A/Livro.epub", "Livro", "", "Cat", "epub")
+
+	if _, encontrada, err := s.CoverFor(id); err != nil || encontrada {
+		t.Fatalf("CoverFor antes de salvar: encontrada=%v err=%v", encontrada, err)
+	}
+
+	if err := s.SaveCover(models.Cover{BookID: id, ContentType: "image/png", Image: []byte("\x89PNG\r\n\x1a\n")}); err != nil {
+		t.Fatal(err)
+	}
+	capa, encontrada, err := s.CoverFor(id)
+	if err != nil || !encontrada {
+		t.Fatalf("CoverFor: encontrada=%v err=%v", encontrada, err)
+	}
+	if capa.ContentType != "image/png" || string(capa.Image) != "\x89PNG\r\n\x1a\n" || capa.Missing {
+		t.Errorf("capa = %+v", capa)
+	}
+
+	// Registrar "sem capa" substitui a linha (não cresce).
+	if err := s.SaveCover(models.Cover{BookID: id, Missing: true}); err != nil {
+		t.Fatal(err)
+	}
+	capa, encontrada, err = s.CoverFor(id)
+	if err != nil || !encontrada || !capa.Missing || len(capa.Image) != 0 {
+		t.Errorf("capa missing = %+v encontrada=%v err=%v", capa, encontrada, err)
+	}
+}

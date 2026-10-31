@@ -18,6 +18,9 @@ type epubFixture struct {
 	caps      []string
 	comScript bool
 	comImagem bool
+	// comCapa: "epub3" (properties=cover-image), "epub2" (meta name=cover),
+	// "spine" (só a imagem na primeira página) ou "" (sem capa).
+	comCapa string
 }
 
 func (f epubFixture) escrever(t *testing.T) []byte {
@@ -34,6 +37,13 @@ func (f epubFixture) escrever(t *testing.T) []byte {
 			t.Fatalf("zip write %s: %v", nome, err)
 		}
 	}
+	adicionarBytes := func(nome string, conteudo []byte) {
+		w, err := zipw.Create(nome)
+		if err != nil {
+			t.Fatalf("zip create %s: %v", nome, err)
+		}
+		_, _ = w.Write(conteudo)
+	}
 
 	adicionar("mimetype", "application/epub+zip")
 	adicionar("META-INF/container.xml", `<?xml version="1.0"?>
@@ -42,6 +52,19 @@ func (f epubFixture) escrever(t *testing.T) []byte {
 </container>`)
 
 	var navItens, spineItens, manifestItens strings.Builder
+	metaCapa := ""
+	switch f.comCapa {
+	case "epub3":
+		manifestItens.WriteString(`<item id="capa-img" href="images/capa.png" media-type="image/png" properties="cover-image"/>`)
+		adicionarBytes("OEBPS/images/capa.png", []byte("\x89PNG\r\n\x1a\ncapa-epub3"))
+	case "epub2":
+		metaCapa = `<meta name="cover" content="capa-img"/>`
+		manifestItens.WriteString(`<item id="capa-img" href="images/capa2.jpeg" media-type="image/jpeg"/>`)
+		adicionarBytes("OEBPS/images/capa2.jpeg", []byte("\xff\xd8\xff\xe0capa-epub2"))
+	case "spine":
+		manifestItens.WriteString(`<item id="capa-img" href="images/capa3.png" media-type="image/png"/>`)
+		adicionarBytes("OEBPS/images/capa3.png", []byte("\x89PNG\r\n\x1a\ncapa-spine"))
+	}
 	for i := range f.caps {
 		n := i + 1
 		arquivo := "cap" + itoa(n) + ".xhtml"
@@ -51,6 +74,9 @@ func (f epubFixture) escrever(t *testing.T) []byte {
 		}
 		if f.comImagem && i == 0 {
 			corpo = `<p>Texto com figura <img src="images/fig.png" alt="figura"/></p>` + corpo
+		}
+		if f.comCapa == "spine" && i == 0 {
+			corpo = `<div><img src="images/capa3.png" alt=""/></div>` + corpo
 		}
 		adicionar("OEBPS/"+arquivo, `<?xml version="1.0" encoding="utf-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml"><head><title>cap</title></head>
@@ -71,6 +97,7 @@ func (f epubFixture) escrever(t *testing.T) []byte {
     <dc:title>`+f.titulo+`</dc:title>
     <dc:creator>`+f.autor+`</dc:creator>
     <dc:language>pt-BR</dc:language>
+    `+metaCapa+`
   </metadata>
   <manifest>`+manifestItens.String()+`</manifest>
   <spine>`+spineItens.String()+`</spine>
@@ -195,6 +222,46 @@ func TestOpenResource_MissingReturnsError(t *testing.T) {
 func TestParse_RejectsGarbage(t *testing.T) {
 	if _, err := Parse(strings.NewReader("nao é zip"), 9, ParseOptions{}); err == nil {
 		t.Fatal("Parse deveria falhar para bytes que não são um EPUB")
+	}
+}
+
+func TestCover_EPUB3Properties(t *testing.T) {
+	dados := epubFixture{titulo: "T", autor: "A", caps: []string{"x"}, comCapa: "epub3"}.escrever(t)
+	conteudo, tipo, err := Cover(bytes.NewReader(dados), int64(len(dados)))
+	if err != nil {
+		t.Fatalf("Cover erro = %v", err)
+	}
+	if !bytes.HasPrefix(conteudo, []byte("\x89PNG")) || tipo != "image/png" {
+		t.Errorf("capa = %d bytes tipo %q", len(conteudo), tipo)
+	}
+}
+
+func TestCover_EPUB2Meta(t *testing.T) {
+	dados := epubFixture{titulo: "T", autor: "A", caps: []string{"x"}, comCapa: "epub2"}.escrever(t)
+	conteudo, tipo, err := Cover(bytes.NewReader(dados), int64(len(dados)))
+	if err != nil {
+		t.Fatalf("Cover erro = %v", err)
+	}
+	if !bytes.HasPrefix(conteudo, []byte("\xff\xd8")) || tipo != "image/jpeg" {
+		t.Errorf("capa = %d bytes tipo %q", len(conteudo), tipo)
+	}
+}
+
+func TestCover_FallsBackToFirstSpineImage(t *testing.T) {
+	dados := epubFixture{titulo: "T", autor: "A", caps: []string{"x", "y"}, comCapa: "spine"}.escrever(t)
+	conteudo, _, err := Cover(bytes.NewReader(dados), int64(len(dados)))
+	if err != nil {
+		t.Fatalf("Cover erro = %v", err)
+	}
+	if !bytes.HasPrefix(conteudo, []byte("\x89PNG")) {
+		t.Errorf("capa inesperada: %q", conteudo[:8])
+	}
+}
+
+func TestCover_NoCoverReturnsError(t *testing.T) {
+	dados := epubFixture{titulo: "T", autor: "A", caps: []string{"x"}}.escrever(t)
+	if _, _, err := Cover(bytes.NewReader(dados), int64(len(dados))); err == nil {
+		t.Fatal("Cover deveria falhar para EPUB sem capa")
 	}
 }
 

@@ -48,6 +48,10 @@ type opfPackage struct {
 		Title    string `xml:"title"`
 		Creator  string `xml:"creator"`
 		Language string `xml:"language"`
+		Metas    []struct {
+			Name    string `xml:"name,attr"`
+			Content string `xml:"content,attr"`
+		} `xml:"meta"`
 	} `xml:"metadata"`
 	Manifest struct {
 		Items []struct {
@@ -142,6 +146,113 @@ func Parse(r io.ReaderAt, size int64, opts ParseOptions) (*Book, error) {
 		return nil, fmt.Errorf("EPUB %q sem capítulos legíveis na spine", opfPath)
 	}
 	return book, nil
+}
+
+// Cover extrai a arte de capa do EPUB: properties="cover-image" (EPUB3),
+// meta name="cover" (EPUB2), href com "cover" no nome ou, por último, a primeira
+// imagem da primeira página da spine.
+func Cover(r io.ReaderAt, size int64) ([]byte, string, error) {
+	zipr, err := zip.NewReader(r, size)
+	if err != nil {
+		return nil, "", fmt.Errorf("abrir EPUB (zip): %w", err)
+	}
+	opfPath, err := findOPF(zipr)
+	if err != nil {
+		return nil, "", err
+	}
+	opfBytes, err := readZipEntry(zipr, opfPath)
+	if err != nil {
+		return nil, "", err
+	}
+	var pkg opfPackage
+	if err := xml.Unmarshal(opfBytes, &pkg); err != nil {
+		return nil, "", fmt.Errorf("ler OPF %q: %w", opfPath, err)
+	}
+
+	opfDir := path.Dir(opfPath)
+	candidatos := coverCandidates(pkg, opfDir)
+	candidatos = append(candidatos, firstSpineImage(zipr, pkg, opfDir))
+	for _, caminho := range candidatos {
+		if caminho == "" {
+			continue
+		}
+		conteudo, err := readZipEntry(zipr, caminho)
+		if err != nil || len(conteudo) == 0 {
+			continue
+		}
+		return conteudo, ContentTypeFor(caminho), nil
+	}
+	return nil, "", fmt.Errorf("EPUB %q sem capa identificável", opfPath)
+}
+
+func coverCandidates(pkg opfPackage, opfDir string) []string {
+	var candidatos []string
+	for _, item := range pkg.Manifest.Items {
+		if strings.Contains(item.Properties, "cover-image") && strings.HasPrefix(item.MediaType, "image/") {
+			candidatos = append(candidatos, path.Join(opfDir, item.Href))
+		}
+	}
+	for _, meta := range pkg.Metadata.Metas {
+		if !strings.EqualFold(meta.Name, "cover") || meta.Content == "" {
+			continue
+		}
+		for _, item := range pkg.Manifest.Items {
+			if item.ID == meta.Content {
+				candidatos = append(candidatos, path.Join(opfDir, item.Href))
+			}
+		}
+	}
+	for _, item := range pkg.Manifest.Items {
+		if strings.HasPrefix(item.MediaType, "image/") && strings.Contains(strings.ToLower(item.Href), "cover") {
+			candidatos = append(candidatos, path.Join(opfDir, item.Href))
+		}
+	}
+	return candidatos
+}
+
+// firstSpineImage cobre os EPUBs que não marcam a capa no OPF: olha a primeira
+// página da spine e usa a primeira imagem dela.
+func firstSpineImage(zipr *zip.Reader, pkg opfPackage, opfDir string) string {
+	hrefPorID := map[string]string{}
+	for _, item := range pkg.Manifest.Items {
+		hrefPorID[item.ID] = item.Href
+	}
+	for _, ref := range pkg.Spine.Itemrefs {
+		href, ok := hrefPorID[ref.IDRef]
+		if !ok {
+			continue
+		}
+		pagina := path.Join(opfDir, href)
+		bruto, err := readZipEntry(zipr, pagina)
+		if err != nil {
+			continue
+		}
+		doc, err := html.Parse(bytes.NewReader(bruto))
+		if err != nil {
+			continue
+		}
+		imagem := primeiraImagem(doc)
+		if imagem == "" {
+			continue
+		}
+		caminho, _ := resolveHref(pagina, imagem)
+		if _, err := readZipEntry(zipr, caminho); err == nil {
+			return caminho
+		}
+	}
+	return ""
+}
+
+func primeiraImagem(n *html.Node) string {
+	if n.Type == html.ElementNode && n.Data == "img" {
+		return atributo(n, "src")
+	}
+	for filho := n.FirstChild; filho != nil; filho = filho.NextSibling {
+		if achado := primeiraImagem(filho); achado != "" {
+			return achado
+		}
+	}
+	return ""
 }
 
 // OpenResource extrai um arquivo interno do EPUB (imagens e afins) com o

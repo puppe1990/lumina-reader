@@ -4,7 +4,11 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"io"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,11 +32,22 @@ func (f *fakeRemote) Open(ctx context.Context, key string) (io.ReadCloser, error
 
 type memoryChapters struct {
 	porLivro map[int64][]models.Chapter
+	covers   map[int64]models.Cover
 	saves    int
 }
 
 func newMemoryChapters() *memoryChapters {
-	return &memoryChapters{porLivro: map[int64][]models.Chapter{}}
+	return &memoryChapters{porLivro: map[int64][]models.Chapter{}, covers: map[int64]models.Cover{}}
+}
+
+func (m *memoryChapters) CoverFor(bookID int64) (models.Cover, bool, error) {
+	capa, ok := m.covers[bookID]
+	return capa, ok, nil
+}
+
+func (m *memoryChapters) SaveCover(capa models.Cover) error {
+	m.covers[capa.BookID] = capa
+	return nil
 }
 
 func (m *memoryChapters) ChaptersFor(bookID int64) ([]models.Chapter, error) {
@@ -145,5 +160,80 @@ func TestEnsureFile_ReusesCacheBySHA(t *testing.T) {
 	}
 	if remoto.opens != 1 {
 		t.Errorf("opens = %d, want 1 (cache por SHA1)", remoto.opens)
+	}
+}
+
+func TestCover_ExtractsAndCachesEPUBCover(t *testing.T) {
+	remoto := &fakeRemote{dados: epubDeTeste(t)}
+	store := newMemoryChapters()
+	servico := New(remoto, store, t.TempDir())
+	livro := models.Book{ID: 2, RemoteKey: "Cat/A/Livro.epub", SHA1: "capa123", Format: "epub"}
+
+	imagem, tipo, err := servico.Cover(context.Background(), livro)
+	if err != nil {
+		t.Fatalf("Cover erro = %v", err)
+	}
+	if len(imagem) == 0 || tipo != "image/png" {
+		t.Errorf("capa = %d bytes tipo %q", len(imagem), tipo)
+	}
+	if remoto.opens != 1 {
+		t.Errorf("opens = %d, want 1", remoto.opens)
+	}
+
+	// Segunda chamada sai do cache do store, sem tocar no B2.
+	if _, _, err := servico.Cover(context.Background(), livro); err != nil {
+		t.Fatalf("segundo Cover erro = %v", err)
+	}
+	if remoto.opens != 1 {
+		t.Errorf("segunda capa não deveria rebaixar: opens = %d", remoto.opens)
+	}
+	salva := store.covers[livro.ID]
+	if salva.Missing || len(salva.Image) == 0 {
+		t.Errorf("capa não cacheada: %+v", salva)
+	}
+}
+
+func TestNormalizarCapa_ReduzArteGrandeParaJPEG(t *testing.T) {
+	// Arte 1400x2100 com ruído determinístico (compPNG não comprime —
+	// o caso real de capa escaneada/fotográfica).
+	fonte := rand.New(rand.NewSource(42))
+	arte := image.NewRGBA(image.Rect(0, 0, 1400, 2100))
+	fonte.Read(arte.Pix)
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, arte); err != nil {
+		t.Fatal(err)
+	}
+
+	saida, tipo, err := normalizarCapa(buf.Bytes(), "image/png")
+	if err != nil {
+		t.Fatalf("normalizarCapa erro = %v", err)
+	}
+	if tipo != "image/jpeg" {
+		t.Errorf("tipo = %q, want image/jpeg", tipo)
+	}
+	decodificada, err := jpeg.Decode(bytes.NewReader(saida))
+	if err != nil {
+		t.Fatalf("saída não é JPEG: %v", err)
+	}
+	if largura := decodificada.Bounds().Dx(); largura > 720 {
+		t.Errorf("largura = %d, want <= 720", largura)
+	}
+	if len(saida) >= buf.Len() {
+		t.Errorf("JPEG (%d bytes) não ficou menor que o PNG (%d bytes)", len(saida), buf.Len())
+	}
+}
+
+func TestNormalizarCapa_MantemImagemPequena(t *testing.T) {
+	arte := image.NewRGBA(image.Rect(0, 0, 40, 60))
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, arte); err != nil {
+		t.Fatal(err)
+	}
+	saida, tipo, err := normalizarCapa(buf.Bytes(), "image/png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tipo != "image/png" || !bytes.Equal(saida, buf.Bytes()) {
+		t.Errorf("imagem pequena deveria passar intacta (tipo %q)", tipo)
 	}
 }

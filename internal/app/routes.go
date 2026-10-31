@@ -35,6 +35,7 @@ func registerRoutes(r *cais.Router, deps Deps, cfg cais.Config) {
 	r.Get("/", exigir(library.ServeHTTP))
 	r.Get("/lendo", exigir(library.Resume))
 	r.Get("/livros/{id}", exigir(cais.IntParam("id", book.Show)))
+	r.Get("/livros/{id}/capa", exigir(cais.IntParam("id", book.Cover)))
 	r.Get("/livros/{id}/cap/{n}", exigir(cais.IntStringParams("id", "n", leitor.Chapter)))
 	r.Get("/livros/{id}/arquivo", exigir(cais.IntParam("id", book.File)))
 	r.Get("/livros/{id}/recurso/{nome...}", exigir(cais.IntStringParams("id", "nome", book.Resource)))

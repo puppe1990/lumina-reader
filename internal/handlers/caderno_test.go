@@ -72,6 +72,40 @@ func TestBook_Show_UnknownReturns404(t *testing.T) {
 	}
 }
 
+func TestBook_CoverServesCachedArt(t *testing.T) {
+	s := setupTestStore(t)
+	comCapa := seedLivro(t, s, "Cat/A/Com.epub", "Com Capa", "", "Cat", "epub")
+	if err := s.SaveCover(models.Cover{BookID: comCapa, ContentType: "image/png", Image: []byte("\x89PNG\r\n\x1a\n")}); err != nil {
+		t.Fatal(err)
+	}
+	semCapa := seedLivro(t, s, "Cat/A/Sem.epub", "Sem Capa", "", "Cat", "epub")
+	if err := s.SaveCover(models.Cover{BookID: semCapa, Missing: true}); err != nil {
+		t.Fatal(err)
+	}
+
+	h := newBookHandler(t, s)
+
+	req := httptest.NewRequest(http.MethodGet, "/livros/"+itoa64(comCapa)+"/capa", nil)
+	rr := httptest.NewRecorder()
+	h.Cover(rr, req, comCapa)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%.200s", rr.Code, rr.Body.String())
+	}
+	if ct := rr.Header().Get("Content-Type"); ct != "image/png" {
+		t.Errorf("Content-Type = %q", ct)
+	}
+	if !strings.Contains(rr.Header().Get("Cache-Control"), "max-age") {
+		t.Errorf("Cache-Control = %q", rr.Header().Get("Cache-Control"))
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/livros/"+itoa64(semCapa)+"/capa", nil)
+	rr = httptest.NewRecorder()
+	h.Cover(rr, req, semCapa)
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("livro sem capa: status = %d, want 404", rr.Code)
+	}
+}
+
 func TestNotes_CreateWritesHighlight(t *testing.T) {
 	s := setupTestStore(t)
 	id := seedLivro(t, s, "Cat/A/Livro.epub", "Livro Ep", "", "Cat", "epub")

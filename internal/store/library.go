@@ -453,3 +453,43 @@ func (s *SQLiteStore) DeleteNote(id int64) error {
 	}
 	return nil
 }
+
+// CoverFor devolve a capa cacheada; encontrada=false quando o livro ainda não
+// passou pela extração.
+func (s *SQLiteStore) CoverFor(bookID int64) (models.Cover, bool, error) {
+	var capa models.Cover
+	var missing int
+	err := s.db.QueryRow(
+		"SELECT book_id, content_type, image, missing FROM book_covers WHERE book_id = ?", bookID,
+	).Scan(&capa.BookID, &capa.ContentType, &capa.Image, &missing)
+	if errors.Is(err, sql.ErrNoRows) {
+		return models.Cover{}, false, nil
+	}
+	if err != nil {
+		return models.Cover{}, false, fmt.Errorf("ler capa do livro %d: %w", bookID, err)
+	}
+	capa.Missing = missing == 1
+	return capa, true, nil
+}
+
+// SaveCover substitui a linha do livro (imagem ou "sem capa").
+func (s *SQLiteStore) SaveCover(capa models.Cover) error {
+	missing := 0
+	if capa.Missing {
+		missing = 1
+	}
+	_, err := s.db.Exec(
+		`INSERT INTO book_covers (book_id, content_type, image, missing, fetched_at)
+		 VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+		 ON CONFLICT(book_id) DO UPDATE SET
+		   content_type = excluded.content_type,
+		   image = excluded.image,
+		   missing = excluded.missing,
+		   fetched_at = CURRENT_TIMESTAMP`,
+		capa.BookID, capa.ContentType, capa.Image, missing,
+	)
+	if err != nil {
+		return fmt.Errorf("salvar capa do livro %d: %w", capa.BookID, err)
+	}
+	return nil
+}

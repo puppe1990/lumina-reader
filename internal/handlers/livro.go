@@ -130,6 +130,27 @@ func (h *BookHandler) File(w http.ResponseWriter, r *http.Request, id int64) {
 	}
 }
 
+// Cover serve a arte do livro (capa do EPUB / 1ª página do PDF), cacheada no
+// banco. Sem capa: 404 e o template mostra a capa tipográfica.
+func (h *BookHandler) Cover(w http.ResponseWriter, r *http.Request, id int64) {
+	book, ok := h.bookOrNotFound(w, r, id)
+	if !ok {
+		return
+	}
+	imagem, tipo, err := h.leitor.Cover(r.Context(), book)
+	if errors.Is(err, reader.ErrNoCover) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", tipo)
+	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	_, _ = w.Write(imagem)
+}
+
 // Resource serve imagens e outros arquivos internos do EPUB.
 func (h *BookHandler) Resource(w http.ResponseWriter, r *http.Request, id int64, nome string) {
 	book, ok := h.bookOrNotFound(w, r, id)

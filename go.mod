@@ -5,6 +5,7 @@ go 1.26.4
 require (
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/puppe1990/amarra-cais v0.25.1
+	golang.org/x/image v0.47.0
 	golang.org/x/net v0.62.0
 	modernc.org/sqlite v1.53.0
 )

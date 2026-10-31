@@ -54,6 +54,9 @@ type Store interface {
 	UpdateNoteText(id int64, texto string) error
 	DeleteNote(id int64) error
 
+	CoverFor(bookID int64) (models.Cover, bool, error)
+	SaveCover(cover models.Cover) error
+
 	Sessions() session.Store
 	Ping() error
 	DB() *sql.DB

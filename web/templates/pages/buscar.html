@@ -16,7 +16,7 @@
       {{ range .Books }}
       <article class="group flex flex-col gap-2">
         <a href="/livros/{{ .ID }}" data-amarra-skip class="relative block aspect-[1/1.5] w-full overflow-hidden rounded-lg bg-surface-container-high shadow-md">
-          {{ template "capa" (dict "titulo" .Title "autor" .Author "tom" .Tone) }}
+          {{ template "capa" (dict "titulo" .Title "autor" .Author "tom" .Tone "id" .ID "sha1" .SHA1) }}
         </a>
         <div class="min-w-0">
           <h4 class="truncate text-[15px] font-semibold leading-snug text-on-surface">{{ .Title }}</h4>

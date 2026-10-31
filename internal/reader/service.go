@@ -3,14 +3,25 @@
 package reader
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"image"
+	"image/gif"
+	"image/jpeg"
+	"image/png"
 	"io"
+	"math"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"golang.org/x/image/draw"
+	"golang.org/x/image/webp"
 
 	"github.com/puppe1990/lumina-reader/internal/epub"
 	"github.com/puppe1990/lumina-reader/internal/models"
@@ -24,6 +35,8 @@ type ChapterStore interface {
 	ChaptersFor(bookID int64) ([]models.Chapter, error)
 	SaveChapters(bookID int64, chapters []models.Chapter) error
 	CountChapters(bookID int64) (int, error)
+	CoverFor(bookID int64) (models.Cover, bool, error)
+	SaveCover(cover models.Cover) error
 }
 
 type Service struct {
@@ -151,6 +164,142 @@ func (s *Service) OpenFile(ctx context.Context, book models.Book) (io.ReadCloser
 // ContentTypeFor mapeia a extensão do arquivo para o Content-Type do download.
 func ContentTypeFor(nome string) string {
 	return epub.ContentTypeFor(nome)
+}
+
+const (
+	capaMaxLargura            = 720
+	capaMaxAltura             = 1080
+	capaBytesSemRedimensionar = 400 << 10
+)
+
+// normalizarCapa deixa a arte leve para a grade: imagens grandes viram JPEG de
+// até 720x1080; pequenas (ou formatos que não decodificamos, como SVG) passam
+// intactas com o content-type original.
+func normalizarCapa(imagem []byte, tipo string) ([]byte, string, error) {
+	var decodificada image.Image
+	var err error
+	switch tipo {
+	case "image/png":
+		decodificada, err = png.Decode(bytes.NewReader(imagem))
+	case "image/jpeg":
+		decodificada, err = jpeg.Decode(bytes.NewReader(imagem))
+	case "image/gif":
+		decodificada, err = gif.Decode(bytes.NewReader(imagem))
+	case "image/webp":
+		decodificada, err = webp.Decode(bytes.NewReader(imagem))
+	default:
+		return imagem, tipo, nil
+	}
+	if err != nil {
+		return imagem, tipo, nil
+	}
+
+	limites := decodificada.Bounds()
+	if limites.Dx() <= capaMaxLargura && limites.Dy() <= capaMaxAltura && len(imagem) <= capaBytesSemRedimensionar {
+		return imagem, tipo, nil
+	}
+	escala := math.Min(1, math.Min(float64(capaMaxLargura)/float64(limites.Dx()), float64(capaMaxAltura)/float64(limites.Dy())))
+	largura := int(math.Max(1, float64(limites.Dx())*escala))
+	altura := int(math.Max(1, float64(limites.Dy())*escala))
+	destino := image.NewRGBA(image.Rect(0, 0, largura, altura))
+	draw.CatmullRom.Scale(destino, destino.Bounds(), decodificada, limites, draw.Src, nil)
+
+	var saida bytes.Buffer
+	if err := jpeg.Encode(&saida, destino, &jpeg.Options{Quality: 82}); err != nil {
+		return imagem, tipo, nil
+	}
+	return saida.Bytes(), "image/jpeg", nil
+}
+
+// ErrNoCover sinaliza livro sem capa identificável (o handler responde 404 e a
+// UI cai na capa tipográfica).
+var ErrNoCover = errors.New("livro sem capa")
+
+// Cover devolve a arte do livro, extraída uma única vez e cacheada no SQLite.
+// EPUB: imagem marcada como capa no arquivo; PDF: 1ª página via pdftoppm
+// (quando o poppler está instalado).
+func (s *Service) Cover(ctx context.Context, book models.Book) ([]byte, string, error) {
+	if capa, encontrada, err := s.store.CoverFor(book.ID); err != nil {
+		return nil, "", err
+	} else if encontrada {
+		if capa.Missing {
+			return nil, "", ErrNoCover
+		}
+		return capa.Image, capa.ContentType, nil
+	}
+
+	imagem, tipo, err := s.extrairCapa(ctx, book)
+	if errors.Is(err, ErrNoCover) {
+		_ = s.store.SaveCover(models.Cover{BookID: book.ID, Missing: true})
+		return nil, "", ErrNoCover
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	imagem, tipo, err = normalizarCapa(imagem, tipo)
+	if err != nil {
+		return nil, "", err
+	}
+	if err := s.store.SaveCover(models.Cover{BookID: book.ID, ContentType: tipo, Image: imagem}); err != nil {
+		return nil, "", err
+	}
+	return imagem, tipo, nil
+}
+
+func (s *Service) extrairCapa(ctx context.Context, book models.Book) ([]byte, string, error) {
+	switch book.Format {
+	case "epub":
+		caminho, err := s.EnsureFile(ctx, book)
+		if err != nil {
+			return nil, "", err
+		}
+		arquivo, err := os.Open(caminho)
+		if err != nil {
+			return nil, "", fmt.Errorf("abrir EPUB em cache %q: %w", caminho, err)
+		}
+		defer func() { _ = arquivo.Close() }()
+		info, err := arquivo.Stat()
+		if err != nil {
+			return nil, "", fmt.Errorf("stat EPUB %q: %w", caminho, err)
+		}
+		imagem, tipo, err := epub.Cover(arquivo, info.Size())
+		if err != nil {
+			return nil, "", ErrNoCover
+		}
+		return imagem, tipo, nil
+	case "pdf":
+		return s.capaDePDF(ctx, book)
+	default:
+		return nil, "", ErrNoCover
+	}
+}
+
+// capaDePDF renderiza a primeira página; sem poppler instalado não há capa.
+func (s *Service) capaDePDF(ctx context.Context, book models.Book) ([]byte, string, error) {
+	ferramenta, err := exec.LookPath("pdftoppm")
+	if err != nil {
+		return nil, "", ErrNoCover
+	}
+	caminho, err := s.EnsureFile(ctx, book)
+	if err != nil {
+		return nil, "", err
+	}
+	dir, err := os.MkdirTemp("", "lumina-capa-*")
+	if err != nil {
+		return nil, "", fmt.Errorf("criar tmp da capa: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+
+	saida := filepath.Join(dir, "capa")
+	comando := exec.CommandContext(ctx, ferramenta, "-f", "1", "-l", "1", "-singlefile", "-jpeg", "-r", "72", caminho, saida)
+	if saidaComando, err := comando.CombinedOutput(); err != nil {
+		return nil, "", fmt.Errorf("pdftoppm falhou para %q: %w (%s)", book.RemoteKey, err, string(saidaComando)[:min(200, len(saidaComando))])
+	}
+	imagem, err := os.ReadFile(saida + ".jpg")
+	if err != nil || len(imagem) == 0 {
+		return nil, "", ErrNoCover
+	}
+	return imagem, "image/jpeg", nil
 }
 
 func (s *Service) cachePath(book models.Book) (string, error) {

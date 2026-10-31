@@ -7,7 +7,7 @@
 
   <section class="flex gap-4 sm:gap-6">
     <div class="h-56 w-36 shrink-0 overflow-hidden rounded-lg shadow-lg sm:h-64 sm:w-44">
-      {{ template "capa" (dict "titulo" .Book.Title "autor" .Book.Author "tom" .Tone) }}
+      {{ template "capa" (dict "titulo" .Book.Title "autor" .Book.Author "tom" .Tone "id" .Book.ID "sha1" .Book.SHA1) }}
     </div>
     <div class="flex min-w-0 flex-col gap-2">
       <h1 class="font-serif text-[22px] font-semibold leading-8 text-on-surface sm:text-2xl">{{ .Book.Title }}</h1>

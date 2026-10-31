@@ -67,6 +67,16 @@ type CategoryCount struct {
 	Total int
 }
 
+// Cover é a arte do livro extraída do arquivo (EPUB) ou da 1ª página (PDF).
+// Missing marca "já tentamos e não tem" para não rebaixar o arquivo a cada
+// request.
+type Cover struct {
+	BookID      int64
+	ContentType string
+	Image       []byte
+	Missing     bool
+}
+
 type LibraryTotals struct {
 	Total int
 	Epubs int

@@ -361,7 +361,28 @@
     });
   }
 
+  // Capas: 404 (livro sem capa) esconde a imagem e a capa tipográfica aparece.
+  function limparCapasQuebradas() {
+    var capas = document.querySelectorAll("img[data-capa]");
+    for (var i = 0; i < capas.length; i++) {
+      var img = capas[i];
+      if (img.complete && img.naturalWidth === 0) img.remove();
+    }
+  }
+  document.addEventListener(
+    "error",
+    function (ev) {
+      var alvo = ev.target;
+      if (alvo && alvo.tagName === "IMG" && alvo.hasAttribute("data-capa")) {
+        alvo.remove();
+      }
+    },
+    true
+  );
+  document.addEventListener("amarra:morphed", limparCapasQuebradas);
+
   function iniciar() {
+    limparCapasQuebradas();
     var raiz = document.querySelector("[data-leitor]");
     if (raiz) iniciarLeitor(raiz);
   }

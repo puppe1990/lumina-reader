@@ -73,7 +73,7 @@
       </div>
       <div class="flex items-start gap-4">
         <div class="h-36 w-24 shrink-0 overflow-hidden rounded shadow-md">
-          {{ template "capa" (dict "titulo" .Book.Title "autor" .Book.Author "tom" .Book.Tone) }}
+          {{ template "capa" (dict "titulo" .Book.Title "autor" .Book.Author "tom" .Book.Tone "id" .Book.ID "sha1" .Book.SHA1) }}
         </div>
         <div class="flex min-w-0 flex-1 flex-col justify-between gap-3 self-stretch">
           <div class="min-w-0">
@@ -123,7 +123,7 @@
         {{ range .Books }}
         <article class="group flex flex-col gap-2">
           <a href="/livros/{{ .ID }}" data-amarra-skip class="relative block aspect-[1/1.5] w-full overflow-hidden rounded-lg bg-surface-container-high shadow-md">
-            {{ template "capa" (dict "titulo" .Title "autor" .Author "tom" .Tone) }}
+            {{ template "capa" (dict "titulo" .Title "autor" .Author "tom" .Tone "id" .ID "sha1" .SHA1) }}
             {{ if eq .Format "pdf" }}
             <span class="absolute right-2 top-2 rounded-full bg-inverse-surface/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-inverse-on-surface">PDF</span>
             {{ end }}

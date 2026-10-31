@@ -1,0 +1,11 @@
+-- up
+CREATE TABLE IF NOT EXISTS book_covers (
+    book_id INTEGER PRIMARY KEY REFERENCES books(id) ON DELETE CASCADE,
+    content_type TEXT NOT NULL DEFAULT '',
+    image BLOB,
+    missing INTEGER NOT NULL DEFAULT 0,
+    fetched_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- down
+DROP TABLE IF EXISTS book_covers;
