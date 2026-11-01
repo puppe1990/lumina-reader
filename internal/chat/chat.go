@@ -11,7 +11,7 @@ import (
 
 const (
 	// LimiteContexto é o teto de caracteres dos trechos enviados ao modelo.
-	LimiteContexto = 12000
+	LimiteContexto = 18000
 	// LimiteContextoAtual é o teto do trecho que está na tela do leitor.
 	LimiteContextoAtual = 3000
 	// LimiteSumario é o teto do sumário (títulos dos capítulos).

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -30,6 +31,9 @@ type TextosDoLivro interface {
 // ChatHandler responde a pergunta em background: o POST devolve um id na hora
 // (o proxy na frente do app corta requisições longas) e o GET devolve o estado
 // até a resposta do LLM chegar.
+// inicioDoLivroCaracteres é quanto do começo do livro vai junto da pergunta.
+const inicioDoLivroCaracteres = 8000
+
 type ChatHandler struct {
 	store     store.Store
 	cfg       cais.Config
@@ -127,28 +131,41 @@ func (h *ChatHandler) recortarLivro(ctx context.Context, livro models.Book, perg
 		}
 	}
 	trechos := chat.SelecionarTrechos(todos, pergunta, chat.MaxTrechos)
-	if len(trechos) < 3 {
-		trechos = append(trechos, abertura(todos, 2-len(trechos))...)
-	}
+	trechos = append(trechos, inicioDoLivro(todos)...)
 	return sumario, trechos
 }
 
-// abertura pega as primeiras unidades com texto de verdade (pula capa/ficha).
-func abertura(unidades []chat.Trecho, limite int) []chat.Trecho {
-	if limite <= 0 {
-		return nil
-	}
-	aberturas := make([]chat.Trecho, 0, limite)
+// inicioDoLivro manda os primeiros pedaços do livro (ficha, sumário e
+// introdução): é onde ficam a tese e as listas do autor, que uma pergunta
+// geral costuma querer. Fatia em trechos do tamanho que o prompt aceita.
+func inicioDoLivro(unidades []chat.Trecho) []chat.Trecho {
+	var construtor strings.Builder
 	for _, unidade := range unidades {
-		if len([]rune(unidade.Texto)) < 300 {
+		texto := strings.TrimSpace(unidade.Texto)
+		if len([]rune(texto)) < 80 {
 			continue
 		}
-		aberturas = append(aberturas, unidade)
-		if len(aberturas) == limite {
+		construtor.WriteString("[" + unidade.Rotulo + "] " + texto + "\n")
+		if construtor.Len() >= inicioDoLivroCaracteres {
 			break
 		}
 	}
-	return aberturas
+	conteudo := []rune(strings.TrimSpace(construtor.String()))
+	if len(conteudo) == 0 {
+		return nil
+	}
+	var fatias []chat.Trecho
+	for indice := 0; indice < len(conteudo); indice += chat.MaxTrechoCaracteres {
+		fim := indice + chat.MaxTrechoCaracteres
+		if fim > len(conteudo) {
+			fim = len(conteudo)
+		}
+		fatias = append(fatias, chat.Trecho{
+			Rotulo: fmt.Sprintf("início do livro %d/%d", len(fatias)+1, (len(conteudo)+chat.MaxTrechoCaracteres-1)/chat.MaxTrechoCaracteres),
+			Texto:  string(conteudo[indice:fim]),
+		})
+	}
+	return fatias
 }
 
 // lerHistorico aceita o JSON do navegador e ignora o que não fizer sentido.

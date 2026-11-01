@@ -98,7 +98,7 @@ func TestMontarMensagens_TruncaContextoPerguntaEHistorico(t *testing.T) {
 		t.Errorf("histórico deveria manter as últimas: %q", mensagens[1].Texto)
 	}
 	corpo := mensagens[len(mensagens)-1].Texto
-	if len(corpo) > 20000 {
+	if len(corpo) > LimiteContexto+LimiteContextoAtual+LimiteSumario+LimitePergunta+600 {
 		t.Errorf("mensagem final grande demais: %d", len(corpo))
 	}
 	if !strings.Contains(corpo, "truncado") {

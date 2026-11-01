@@ -214,6 +214,7 @@ func TestChat_PerguntaUsaOLivroInteiro(t *testing.T) {
 	h := newChatHandlerComTextos(t, s, conversador, []reader.Unidade{
 		{Rotulo: "capa", Texto: "curto"},
 		{Rotulo: "introdução", Texto: aberturaLonga},
+		{Rotulo: "sumário", Texto: "1. Make It Your Own; 2. Everything Matters; 3. Surprise and Delight; 4. Embrace Resistance; 5. Leave Your Mark. " + strings.Repeat("sumario ", 20)},
 		{Rotulo: "capítulo 2 — O método", Texto: "A degradação das plataformas é discutida aqui com detalhes."},
 		{Rotulo: "capítulo 3 — Fecho", Texto: "Considerações finais."},
 	})
@@ -233,8 +234,8 @@ func TestChat_PerguntaUsaOLivroInteiro(t *testing.T) {
 			t.Errorf("prompt sem %q:\n%s", alvo, corpo)
 		}
 	}
-	if strings.Contains(corpo, "[capa] curto") {
-		t.Errorf("unidade curta (capa) não deveria virar abertura: %s", corpo)
+	if !strings.Contains(corpo, "início do livro") || !strings.Contains(corpo, "Make It Your Own") {
+		t.Errorf("início do livro (sumário/introdução) deveria entrar no prompt:\n%s", corpo)
 	}
 }
 
