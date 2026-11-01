@@ -77,25 +77,32 @@
     .promise.then(function (pdf) {
       pdfDoc = pdf;
       carregando.classList.add("hidden");
-      for (var n = 1; n <= pdf.numPages; n++) {
-        var div = document.createElement("div");
-        div.className = "pdf-pagina relative w-full overflow-hidden rounded bg-white shadow-md";
-        div.setAttribute("data-pagina", String(n));
-        div.style.aspectRatio = "1 / 1.414";
-        var canvas = document.createElement("canvas");
-        canvas.className = "block h-auto w-full";
-        div.appendChild(canvas);
-        container.appendChild(div);
-        paginas.push({ numero: n, div: div, canvas: canvas, renderizada: false, renderizando: false });
-      }
-      atualizarRotulos();
-      if (paginaInicial > 1) {
-        setTimeout(function () {
-          irParaPagina(paginaInicial, false);
-          manterJanela(paginaInicial);
-        }, 60);
-      }
-      manterJanela(paginaInicial);
+      // Proporção fixa (da página 1) nos placeholders: se cada render mudasse a
+      // altura do div, o scroll "andaria" sozinho e renderizaria o livro todo
+      // em cascata. Páginas de tamanho diferente ficam em letterbox.
+      return pdf.getPage(1).then(function (primeira) {
+        var base = primeira.getViewport({ scale: 1 });
+        var proporcao = base.width + " / " + base.height;
+        for (var n = 1; n <= pdf.numPages; n++) {
+          var div = document.createElement("div");
+          div.className = "pdf-pagina relative w-full overflow-hidden rounded bg-white shadow-md";
+          div.setAttribute("data-pagina", String(n));
+          div.style.aspectRatio = proporcao;
+          var canvas = document.createElement("canvas");
+          canvas.className = "block h-full w-full object-contain";
+          div.appendChild(canvas);
+          container.appendChild(div);
+          paginas.push({ numero: n, div: div, canvas: canvas, renderizada: false, renderizando: false });
+        }
+        atualizarRotulos();
+        if (paginaInicial > 1) {
+          setTimeout(function () {
+            irParaPagina(paginaInicial, false);
+            manterJanela(paginaInicial);
+          }, 60);
+        }
+        manterJanela(paginaInicial);
+      });
     })
     .catch(function (erro) {
       carregando.innerHTML = "";
@@ -117,7 +124,6 @@
         var viewport = pg.getViewport({ scale: (largura / base.width) * dpr });
         pagina.canvas.width = Math.floor(viewport.width);
         pagina.canvas.height = Math.floor(viewport.height);
-        pagina.div.style.aspectRatio = base.width + " / " + base.height;
         return pg.render({ canvasContext: pagina.canvas.getContext("2d"), viewport: viewport }).promise;
       })
       .then(function () {
