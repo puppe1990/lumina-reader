@@ -22,6 +22,8 @@ import (
 
 	"github.com/puppe1990/lumina-reader/internal/app"
 	"github.com/puppe1990/lumina-reader/internal/b2"
+	"github.com/puppe1990/lumina-reader/internal/chat"
+	"github.com/puppe1990/lumina-reader/internal/handlers"
 	appi18n "github.com/puppe1990/lumina-reader/internal/i18n"
 	"github.com/puppe1990/lumina-reader/internal/library"
 	"github.com/puppe1990/lumina-reader/internal/reader"
@@ -102,16 +104,35 @@ func bootstrapWithConfig(ctx context.Context, cfg cais.Config) (*app.App, error)
 	}
 
 	return app.New(cfg, app.Deps{
-		Views:         views,
-		Store:         s,
-		StaticDir:     staticDir,
-		Site:          meta.SiteFrom("lumina", cfg.AppURL),
-		Catalog:       catalog,
-		Catalogs:      catalogs,
-		DevReload:     devReload,
-		Leitor:        leitor,
-		Sincronizador: sincronizador,
+		Views:           views,
+		Store:           s,
+		StaticDir:       staticDir,
+		Site:            meta.SiteFrom("lumina", cfg.AppURL),
+		Catalog:         catalog,
+		Catalogs:        catalogs,
+		DevReload:       devReload,
+		Leitor:          leitor,
+		Sincronizador:   sincronizador,
+		ChatConversador: buildChat(),
 	})
+}
+
+// buildChat monta o provedor do "conversar com o livro" (OpenAI-compatível —
+// NVIDIA NIM por padrão). Sem LUMINA_CHAT_API_KEY o recurso fica desligado.
+func buildChat() handlers.ConversadorRLM {
+	chave := strings.TrimSpace(os.Getenv("LUMINA_CHAT_API_KEY"))
+	if chave == "" {
+		return nil
+	}
+	base := strings.TrimSpace(os.Getenv("LUMINA_CHAT_BASE_URL"))
+	if base == "" {
+		base = "https://integrate.api.nvidia.com/v1"
+	}
+	modelo := strings.TrimSpace(os.Getenv("LUMINA_CHAT_MODEL"))
+	if modelo == "" {
+		modelo = "minimaxai/minimax-m3.1-flash"
+	}
+	return chat.NovoCliente(base, chave, modelo)
 }
 
 // bootstrapOwner cria o único usuário do app em produção a partir de

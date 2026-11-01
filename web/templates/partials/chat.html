@@ -1,0 +1,29 @@
+{{ define "chat-livro" }}
+{{/* "Conversar com o livro": botão na barra do leitor + diálogo. O contexto
+     (trecho atual) vem do leitor da página via window.luminaPdf (PDF) ou do
+     próprio DOM (EPUB). Contexto: dict "id", "posicao". */}}
+<span class="contents" amarra-hook="dialog">
+  <button type="button" data-amarra-dialog-open aria-label="Conversar com o livro" class="flex h-10 w-10 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface">
+    <span class="material-symbols-outlined text-[20px]">forum</span>
+  </button>
+  <dialog data-amarra-dialog-target data-chat-root data-book="{{ .id }}" class="m-auto w-[min(94vw,30rem)] max-h-[86vh] rounded-2xl bg-surface p-0 text-on-surface shadow-xl backdrop:bg-black/25 backdrop:backdrop-blur-sm">
+    <div class="flex items-center justify-between gap-2 border-b border-on-surface/5 px-4 py-3">
+      <div class="min-w-0">
+        <span class="block text-sm font-semibold">Conversar com o livro</span>
+        <span data-chat-posicao class="block truncate text-[11px] text-secondary">{{ .posicao }}</span>
+      </div>
+      <button type="button" data-amarra-dialog-close class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-container text-on-surface-variant hover:text-on-surface" aria-label="Fechar">
+        <span class="material-symbols-outlined text-[16px]">close</span>
+      </button>
+    </div>
+    <div data-chat-mensagens class="flex max-h-[48vh] min-h-[9rem] flex-col gap-2 overflow-y-auto px-4 py-3"></div>
+    <div data-chat-sugestoes class="flex flex-wrap gap-1.5 px-4 pb-2"></div>
+    <form data-chat-form class="flex items-end gap-2 border-t border-on-surface/5 px-3 py-3">
+      <textarea data-chat-pergunta rows="1" placeholder="Pergunte sobre este trecho…" class="max-h-28 min-h-10 flex-1 resize-none rounded-xl border border-outline-variant/60 bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none placeholder:text-secondary/70 focus:border-primary"></textarea>
+      <button type="submit" data-chat-enviar class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary shadow-sm transition-colors hover:bg-primary-container" aria-label="Enviar pergunta">
+        <span class="material-symbols-outlined text-[20px]">send</span>
+      </button>
+    </form>
+  </dialog>
+</span>
+{{ end }}

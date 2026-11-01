@@ -19,6 +19,7 @@ func registerRoutes(r *cais.Router, deps Deps, cfg cais.Config) {
 	colecoes := handlers.NewCollectionsHandler(deps.Views, deps.Site, deps.Catalog, cfg, deps.Store)
 	busca := handlers.NewSearchHandler(deps.Views, deps.Site, deps.Catalog, cfg, deps.Store)
 	sincronizar := handlers.NewSyncHandler(deps.Views, deps.Site, deps.Catalog, cfg, deps.Store, deps.Sincronizador)
+	chat := handlers.NewChatHandler(deps.Store, cfg, deps.ChatConversador)
 	naoEncontrado := handlers.NewNotFoundHandler(deps.Views, deps.Site, deps.Catalog, cfg)
 	auth := handlers.NewAuthHandler(deps.Views, deps.Store, deps.Site, deps.Store.Sessions(), cfg, deps.Catalog)
 
@@ -40,6 +41,7 @@ func registerRoutes(r *cais.Router, deps Deps, cfg cais.Config) {
 	r.Get("/livros/{id}/cap/{n}", exigir(cais.IntStringParams("id", "n", leitor.Chapter)))
 	r.Get("/livros/{id}/pdf", exigir(cais.IntParam("id", leitor.PDF)))
 	r.Get("/livros/{id}/busca", exigir(cais.IntParam("id", leitor.Search)))
+	r.Post("/livros/{id}/chat", exigir(cais.IntParam("id", chat.Post)))
 	r.Get("/livros/{id}/arquivo", exigir(cais.IntParam("id", book.File)))
 	r.Get("/livros/{id}/recurso/{nome...}", exigir(cais.IntStringParams("id", "nome", book.Resource)))
 	r.Post("/livros/{id}/progresso", exigir(cais.IntParam("id", leitor.Progress)))

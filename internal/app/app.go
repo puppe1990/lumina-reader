@@ -44,6 +44,9 @@ type Deps struct {
 	Leitor *reader.Service
 	// Sincronizador espelha o balde B2 na estante; nil desliga o botão sincronizar.
 	Sincronizador handlers.Sincronizador
+	// ChatConversador é o provedor de LLM do "conversar com o livro"; nil
+	// mantém o botão visível mas responde que falta configuração.
+	ChatConversador handlers.ConversadorRLM
 }
 
 // remoteNaoConfigurado mantém o app bootável sem credenciais B2 (testes, dev
@@ -123,8 +126,10 @@ func New(cfg cais.Config, deps Deps) (*App, error) {
 			Handler:           r,
 			ReadHeaderTimeout: 10 * time.Second,
 			ReadTimeout:       30 * time.Second,
-			WriteTimeout:      30 * time.Second,
-			IdleTimeout:       60 * time.Second,
+			// O chat com o livro espera o provedor de LLM (modelos de raciocínio
+			// passam de 30s com folga).
+			WriteTimeout: 150 * time.Second,
+			IdleTimeout:  60 * time.Second,
 		},
 	}, nil
 }

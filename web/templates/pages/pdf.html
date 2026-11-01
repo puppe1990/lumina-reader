@@ -35,6 +35,7 @@
             </div>
           </dialog>
         </span>
+        {{ template "chat-livro" (dict "id" .Book.ID "posicao" (printf "página %d" .Page)) }}
         <span class="contents" amarra-hook="dialog">
           <button type="button" data-amarra-dialog-open aria-label="Tema de leitura" class="flex h-10 w-10 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface">
             <span class="material-symbols-outlined text-[20px]">format_size</span>

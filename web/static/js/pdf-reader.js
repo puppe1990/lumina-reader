@@ -294,35 +294,54 @@
     });
   }
 
+  // Texto da página (para a busca e para o chat com o livro), cacheado.
+  function textoDaPagina(numero) {
+    if (textosPorPagina[numero] !== undefined) return Promise.resolve(textosPorPagina[numero]);
+    if (!pdfDoc) return Promise.resolve("");
+    return pdfDoc
+      .getPage(numero)
+      .then(function (pg) {
+        return pg.getTextContent();
+      })
+      .then(function (conteudo) {
+        var texto = conteudo.items
+          .map(function (item) {
+            return item.str || "";
+          })
+          .join(" ");
+        texto = texto.replace(/\s+/g, " ").trim();
+        textosPorPagina[numero] = texto;
+        return texto;
+      })
+      .catch(function () {
+        textosPorPagina[numero] = "";
+        return "";
+      });
+  }
+
+  function rotuloPosicao() {
+    return "página " + paginaAtual + (pdfDoc ? " de " + pdfDoc.numPages : "");
+  }
+
+  // O "conversar com o livro" usa estes dois: a posição viva e o trecho atual.
+  window.luminaPdf = {
+    posicao: rotuloPosicao,
+    textoDaPaginaAtual: function () {
+      return textoDaPagina(paginaAtual);
+    },
+    contexto: function () {
+      return textoDaPagina(paginaAtual).then(function (texto) {
+        return { posicao: rotuloPosicao(), texto: texto || "" };
+      });
+    },
+  };
+
   // busca no texto do PDF (getTextContent por página, cacheado)
   var campoBusca = document.getElementById("busca-termo");
   if (campoBusca) {
     var statusBusca = document.getElementById("busca-status");
     var listaBusca = document.getElementById("busca-hits");
     var timerBusca = null;
-
-    function textoDaPagina(numero) {
-      if (textosPorPagina[numero] !== undefined) return Promise.resolve(textosPorPagina[numero]);
-      return pdfDoc
-        .getPage(numero)
-        .then(function (pg) {
-          return pg.getTextContent();
-        })
-        .then(function (conteudo) {
-          var texto = conteudo.items
-            .map(function (item) {
-              return item.str || "";
-            })
-            .join(" ");
-          texto = texto.replace(/\s+/g, " ").trim();
-          textosPorPagina[numero] = texto;
-          return texto;
-        })
-        .catch(function () {
-          textosPorPagina[numero] = "";
-          return "";
-        });
-    }
 
     function recorte(texto, pos, tamanho) {
       var inicio = Math.max(0, pos - 60);

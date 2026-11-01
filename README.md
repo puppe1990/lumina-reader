@@ -24,13 +24,15 @@ A biblioteca é privada: login por sessão (sem cadastro público). `Documentos 
 
 ## Configuração
 
-| Env                                                          | Para quê                                                              |
-| ------------------------------------------------------------ | --------------------------------------------------------------------- |
-| `B2_APPLICATION_KEY_ID` / `B2_APPLICATION_KEY` / `B2_BUCKET` | acervo no Backblaze (sem eles a estante não sincroniza)               |
-| `OWNER_EMAIL` / `OWNER_PASSWORD`                             | cria o usuário inicial no primeiro boot em produção (não há cadastro) |
-| `DB_PATH`                                                    | SQLite (o cache dos livros fica em `{dir do DB}/cache`)               |
-| `APP_URL`, `ADMIN_TOKEN`, `ENV=production`                   | exigidos em produção pelo `cais.Validate()`                           |
-| `CSP_STYLE_SRC` / `CSP_FONT_SRC`                             | Google Fonts (Literata, Inter, Material Symbols)                      |
+| Env                                                          | Para quê                                                                                                     |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `B2_APPLICATION_KEY_ID` / `B2_APPLICATION_KEY` / `B2_BUCKET` | acervo no Backblaze (sem eles a estante não sincroniza)                                                      |
+| `OWNER_EMAIL` / `OWNER_PASSWORD`                             | cria o usuário inicial no primeiro boot em produção (não há cadastro)                                        |
+| `LUMINA_CHAT_API_KEY`                                        | "conversar com o livro" (endpoint OpenAI-compatível; sem ela o recurso responde que falta configurar)        |
+| `LUMINA_CHAT_BASE_URL` / `LUMINA_CHAT_MODEL`                 | provedor do chat (padrão NVIDIA NIM: `https://integrate.api.nvidia.com/v1` + `minimaxai/minimax-m3.1-flash`) |
+| `DB_PATH`                                                    | SQLite (o cache dos livros fica em `{dir do DB}/cache`)                                                      |
+| `APP_URL`, `ADMIN_TOKEN`, `ENV=production`                   | exigidos em produção pelo `cais.Validate()`                                                                  |
+| `CSP_STYLE_SRC` / `CSP_FONT_SRC`                             | Google Fonts (Literata, Inter, Material Symbols)                                                             |
 
 Desenvolvimento usa o seed `demo@example.com` / `password`.
 
@@ -54,7 +56,8 @@ internal/library/   metadados derivados do caminho remoto + sincronização do b
 internal/epub/      parser EPUB (OPF/spine/nav) + sanitização e reescrita de imagens
 internal/reader/    download para cache por SHA1 + capítulos no SQLite (parse na 1ª abertura)
 internal/store/     SQLite: books, book_chapters, reading_progress, book_notes, reading_days
-internal/handlers/  biblioteca, livro, leitor, caderno, coleções, busca, sincronizar, auth
+internal/chat/      "conversar com o livro": monta a conversa (system + trecho) e fala com o provedor OpenAI-compatível
+internal/handlers/  biblioteca, livro, leitor, caderno, coleções, busca, sincronizar, chat, auth
 web/templates/      layout + pages (Drive morphs #amarra-main) + partial "capa"
 web/static/js/      amarra.js (framework) + lumina.js (leitor: tema, progresso, seleção)
 ```
