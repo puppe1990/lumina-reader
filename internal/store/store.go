@@ -24,6 +24,7 @@ var ErrUserNotFound = errors.New("usuário não encontrado")
 type Store interface {
 	FindUserByEmail(email string) (models.User, error)
 	GetUser(id int64) (models.User, error)
+	SingleUserID() (int64, error)
 	UpdateUserEmail(userID int64, email string) error
 	UpdateUserPassword(userID int64, passwordHash string) error
 	CreateUser(email, passwordHash string) (int64, error)
@@ -151,6 +152,19 @@ func (s *SQLiteStore) GetUser(id int64) (models.User, error) {
 		return models.User{}, fmt.Errorf("get user %d: %w", id, err)
 	}
 	return u, nil
+}
+
+// SingleUserID devolve o id do único usuário do app (login pessoal).
+func (s *SQLiteStore) SingleUserID() (int64, error) {
+	var id int64
+	err := s.db.QueryRow("SELECT id FROM users ORDER BY id LIMIT 1").Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrUserNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("ler usuário único: %w", err)
+	}
+	return id, nil
 }
 
 // UpdateUserEmail troca o email do usuário logado (o login passa a ser ele).

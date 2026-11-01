@@ -225,3 +225,19 @@ func TestPerfil_TrocaEmailJaUsado(t *testing.T) {
 		t.Fatalf("status = %d, want 422 com 'já é usado'", rr.Code)
 	}
 }
+
+func TestStore_SingleUserID(t *testing.T) {
+	s := setupTestStore(t)
+	if _, err := s.SingleUserID(); err == nil {
+		t.Fatal("sem usuários deveria dar erro")
+	}
+	hash, _ := session.HashPassword("qualquer123")
+	id, err := s.CreateUser("unico@example.com", hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obtido, err := s.SingleUserID()
+	if err != nil || obtido != id {
+		t.Fatalf("SingleUserID = %d err=%v, want %d", obtido, err, id)
+	}
+}

@@ -91,6 +91,10 @@ func bootstrapWithConfig(ctx context.Context, cfg cais.Config) (*app.App, error)
 		_ = s.Close()
 		return nil, fmt.Errorf("usuário inicial: %w", err)
 	}
+	if err := repararContaDoDono(s); err != nil {
+		_ = s.Close()
+		return nil, fmt.Errorf("conserto da conta: %w", err)
+	}
 
 	leitor, sincronizador := buildAcervo(cfg, s)
 	if sincronizador != nil {
@@ -135,8 +139,9 @@ func buildChat() handlers.ConversadorRLM {
 	return chat.NovoCliente(base, chave, modelo)
 }
 
-// bootstrapOwner cria o único usuário do app em produção a partir de
-// OWNER_EMAIL/OWNER_PASSWORD enquanto a tabela estiver vazia (não há cadastro).
+// bootstrapOwner cria o único usuário do app a partir de
+// OWNER_EMAIL/OWNER_PASSWORD enquanto a tabela estiver vazia (não há cadastro)
+// e aplica um conserto de acesso quando OWNER_RESET_EMAIL está setado.
 func bootstrapOwner(s *store.SQLiteStore) error {
 	email := strings.TrimSpace(os.Getenv("OWNER_EMAIL"))
 	senha := os.Getenv("OWNER_PASSWORD")
@@ -155,6 +160,34 @@ func bootstrapOwner(s *store.SQLiteStore) error {
 		return err
 	}
 	log.Printf("lumina: usuário inicial %s criado", email)
+	return nil
+}
+
+// repararContaDoDono troca email/senha do único usuário no boot quando
+// OWNER_RESET_EMAIL (e opcionalmente OWNER_RESET_PASSWORD) estão setados.
+// Serve de recuperação de acesso; remova as envs depois de usar.
+func repararContaDoDono(s *store.SQLiteStore) error {
+	email := strings.ToLower(strings.TrimSpace(os.Getenv("OWNER_RESET_EMAIL")))
+	if email == "" {
+		return nil
+	}
+	id, err := s.SingleUserID()
+	if err != nil {
+		return nil // tabela vazia: o seed acima cuida
+	}
+	if err := s.UpdateUserEmail(id, email); err != nil {
+		return fmt.Errorf("conserto do email: %w", err)
+	}
+	if senha := os.Getenv("OWNER_RESET_PASSWORD"); senha != "" {
+		hash, err := session.HashPassword(senha)
+		if err != nil {
+			return fmt.Errorf("conserto da senha: %w", err)
+		}
+		if err := s.UpdateUserPassword(id, hash); err != nil {
+			return fmt.Errorf("conserto da senha: %w", err)
+		}
+	}
+	log.Printf("lumina: conta do dono reparada no boot (email %s)", email)
 	return nil
 }
 
