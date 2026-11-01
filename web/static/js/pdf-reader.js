@@ -56,7 +56,8 @@
     })(botoesTema[t]);
   }
 
-  var trilho = document.getElementById("pdf-paginas");
+  var viewport = document.getElementById("pdf-paginas");
+  var trilho = document.getElementById("pdf-trilho");
   var carregando = document.getElementById("pdf-carregando");
   var rotuloPagina = document.getElementById("pdf-pagina");
   var posicao = document.getElementById("pdf-posicao");
@@ -80,7 +81,7 @@
       carregando.classList.add("hidden");
       for (var n = 1; n <= pdf.numPages; n++) {
         var slide = document.createElement("div");
-        slide.className = "pdf-pagina flex h-full w-full shrink-0 snap-center items-center justify-center";
+        slide.className = "pdf-pagina flex h-full w-full shrink-0 items-center justify-center";
         slide.setAttribute("data-pagina", String(n));
         var canvas = document.createElement("canvas");
         canvas.className = "pdf-folha max-h-full max-w-full rounded bg-white shadow-md";
@@ -89,10 +90,8 @@
         paginas.push({ numero: n, div: slide, canvas: canvas, renderizada: false, renderizando: false });
       }
       atualizarRotulos();
-      setTimeout(function () {
-        irParaPagina(paginaInicial, false);
-      }, 60);
-      manterJanela(paginaInicial);
+      irParaPagina(paginaInicial, false);
+      manterJanela(paginaAtual);
     })
     .catch(function (erro) {
       carregando.innerHTML = "";
@@ -113,16 +112,16 @@
       .then(function (pg) {
         var base = pg.getViewport({ scale: 1 });
         var dpr = Math.min(window.devicePixelRatio || 1, 2);
-        var larguraTela = Math.max(240, trilho.clientWidth - 28);
-        var alturaTela = Math.max(240, trilho.clientHeight - 28);
+        var larguraTela = Math.max(240, viewport.clientWidth - 28);
+        var alturaTela = Math.max(240, viewport.clientHeight - 28);
         var escala = Math.min(larguraTela / base.width, alturaTela / base.height);
-        var viewport = pg.getViewport({ scale: escala * dpr });
-        pagina.canvas.width = Math.floor(viewport.width);
-        pagina.canvas.height = Math.floor(viewport.height);
+        var tela = pg.getViewport({ scale: escala * dpr });
+        pagina.canvas.width = Math.floor(tela.width);
+        pagina.canvas.height = Math.floor(tela.height);
         // Tamanho CSS em px lógicos para o canvas caber exato na tela.
-        pagina.canvas.style.width = Math.floor(viewport.width / dpr) + "px";
-        pagina.canvas.style.height = Math.floor(viewport.height / dpr) + "px";
-        return pg.render({ canvasContext: pagina.canvas.getContext("2d"), viewport: viewport }).promise;
+        pagina.canvas.style.width = Math.floor(tela.width / dpr) + "px";
+        pagina.canvas.style.height = Math.floor(tela.height / dpr) + "px";
+        return pg.render({ canvasContext: pagina.canvas.getContext("2d"), viewport: tela }).promise;
       })
       .then(function () {
         pagina.renderizada = true;
@@ -132,17 +131,17 @@
       });
   }
 
+  // Paginação por transform no trilho: sem depender de scroll nativo (o
+  // scroll-snap do Chromium cancelava o salto e o smooth no meio do caminho).
   function irParaPagina(numero, suave) {
     numero = Math.max(1, Math.min(paginas.length || 1, numero));
-    var alvo = paginas[numero - 1];
-    if (!alvo) return;
-    trilho.scrollTo({ left: alvo.offsetLeft, behavior: suave === false ? "auto" : "smooth" });
-    if (numero !== paginaAtual) {
-      paginaAtual = numero;
-      atualizarRotulos();
-      manterJanela(numero);
-      agendarSalvamento();
-    }
+    var mudou = numero !== paginaAtual;
+    paginaAtual = numero;
+    trilho.style.transition = suave === false ? "none" : "transform 260ms ease-out";
+    trilho.style.transform = "translateX(" + -(numero - 1) * 100 + "%)";
+    atualizarRotulos();
+    manterJanela(numero);
+    if (mudou) agendarSalvamento();
   }
 
   function proximaPagina() {
@@ -179,12 +178,6 @@
     if (barra) barra.style.width = percent + "%";
   }
 
-  function paginaDoScroll() {
-    if (!trilho.clientWidth) return paginaAtual;
-    var indice = Math.round(trilho.scrollLeft / trilho.clientWidth) + 1;
-    return Math.max(1, Math.min(paginas.length || 1, indice));
-  }
-
   var salvarPendente = null;
   function salvarProgresso() {
     if (!pdfDoc) return;
@@ -199,24 +192,36 @@
     salvarPendente = setTimeout(salvarProgresso, 1200);
   }
 
-  trilho.addEventListener(
-    "scroll",
-    function () {
-      if (!pdfDoc) return;
-      var atual = paginaDoScroll();
-      if (atual === paginaAtual) return;
-      paginaAtual = atual;
-      atualizarRotulos();
-      manterJanela(atual);
-      agendarSalvamento();
-    },
-    { passive: true }
-  );
+  // Swipe: arrasto horizontal no viewport vira página (pointer events cobrem
+  // toque e mouse). O clique nas bordas continua valendo como atalho.
+  var toqueInicio = null;
+  var swipeConsumido = false;
+  viewport.addEventListener("pointerdown", function (ev) {
+    toqueInicio = { x: ev.clientX, y: ev.clientY, id: ev.pointerId };
+  });
+  viewport.addEventListener("pointerup", function (ev) {
+    if (!toqueInicio) return;
+    var dx = ev.clientX - toqueInicio.x;
+    var dy = ev.clientY - toqueInicio.y;
+    var mesmoPonteiro = ev.pointerId === toqueInicio.id;
+    toqueInicio = null;
+    if (!mesmoPonteiro) return;
+    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return; // clique/tap ou rolagem vertical
+    swipeConsumido = true; // o clique sintético depois do arrasto não pode virar página de novo
+    if (dx < 0) proximaPagina();
+    else paginaAnterior();
+  });
+  viewport.addEventListener("pointercancel", function () {
+    toqueInicio = null;
+  });
 
-  // Toque/clique nas bordas vira página (padrão de e-reader); o centro não age.
-  trilho.addEventListener("click", function (ev) {
+  viewport.addEventListener("click", function (ev) {
+    if (swipeConsumido) {
+      swipeConsumido = false;
+      return;
+    }
     if (ev.target.closest("button") || ev.target.closest("a")) return;
-    var rect = trilho.getBoundingClientRect();
+    var rect = viewport.getBoundingClientRect();
     var x = ev.clientX - rect.left;
     if (x < rect.width * 0.28) paginaAnterior();
     else if (x > rect.width * 0.72) proximaPagina();
