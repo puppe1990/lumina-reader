@@ -168,23 +168,16 @@
     }
   }
 
-  async function obterTradutor(idioma, aoProgredir) {
+  async function obterTradutor(idioma) {
     if (tradutor && tradutorIdioma === idioma) return tradutor;
-    var monitor = function (m) {
-      m.addEventListener("downloadprogress", function (evento) {
-        if (aoProgredir) aoProgredir(Math.round((evento.loaded || 0) * 100));
-      });
-    };
+    // Sem "monitor": nesta versão do Chrome passar o callback quebra o create
+    // com NotSupportedError. O download acontece no gesto do clique.
     try {
-      tradutor = await window.Translator.create({
-        sourceLanguage: idioma,
-        targetLanguage: "pt",
-        monitor: monitor,
-      });
+      tradutor = await window.Translator.create({ sourceLanguage: idioma, targetLanguage: "pt" });
       tradutorIdioma = idioma;
     } catch (erroCriacao) {
       if (idioma === "en") throw erroCriacao;
-      tradutor = await window.Translator.create({ sourceLanguage: "en", targetLanguage: "pt", monitor: monitor });
+      tradutor = await window.Translator.create({ sourceLanguage: "en", targetLanguage: "pt" });
       tradutorIdioma = "en";
     }
     return tradutor;
@@ -245,9 +238,7 @@
         rotulo.textContent = "baixando o tradutor (uma vez só)…";
         icone.remove();
       }
-      var motor = await obterTradutor(idioma, function (porcento) {
-        if (porcento) rotulo.textContent = "baixando o tradutor (uma vez só): " + porcento + "%";
-      });
+      var motor = await obterTradutor(idioma);
       var traducao = (await motor.translate(texto)).trim();
       status.remove();
       var resultado = document.createElement("p");
