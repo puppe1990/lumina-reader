@@ -104,8 +104,9 @@ func (h *ChatHandler) Get(w http.ResponseWriter, r *http.Request, bookID int64, 
 }
 
 // recortarLivro lê o livro inteiro e separa o sumário (só EPUB) dos trechos
-// que respondem à pergunta. Formato sem texto (mobi/azw3) devolve vazio e o
-// modelo cai no trecho atual enviado pelo navegador.
+// que respondem à pergunta. Poucos acertos ganham a abertura do livro (a
+// introdução costuma ter a tese e as listas do autor). Formato sem texto
+// (mobi/azw3) devolve vazio e o modelo cai no trecho atual do navegador.
 func (h *ChatHandler) recortarLivro(ctx context.Context, livro models.Book, pergunta string) ([]string, []chat.Trecho) {
 	if h.textos == nil {
 		return nil, nil
@@ -125,7 +126,29 @@ func (h *ChatHandler) recortarLivro(ctx context.Context, livro models.Book, perg
 			sumario = append(sumario, unidade.Rotulo)
 		}
 	}
-	return sumario, chat.SelecionarTrechos(todos, pergunta, chat.MaxTrechos)
+	trechos := chat.SelecionarTrechos(todos, pergunta, chat.MaxTrechos)
+	if len(trechos) < 3 {
+		trechos = append(trechos, abertura(todos, 2-len(trechos))...)
+	}
+	return sumario, trechos
+}
+
+// abertura pega as primeiras unidades com texto de verdade (pula capa/ficha).
+func abertura(unidades []chat.Trecho, limite int) []chat.Trecho {
+	if limite <= 0 {
+		return nil
+	}
+	aberturas := make([]chat.Trecho, 0, limite)
+	for _, unidade := range unidades {
+		if len([]rune(unidade.Texto)) < 300 {
+			continue
+		}
+		aberturas = append(aberturas, unidade)
+		if len(aberturas) == limite {
+			break
+		}
+	}
+	return aberturas
 }
 
 // lerHistorico aceita o JSON do navegador e ignora o que não fizer sentido.

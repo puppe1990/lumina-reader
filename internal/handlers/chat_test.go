@@ -210,8 +210,10 @@ func TestChat_PerguntaUsaOLivroInteiro(t *testing.T) {
 	s := setupTestStore(t)
 	id := seedLivro(t, s, "Cat/A/Livro.epub", "Livro", "Autora", "Cat", "epub")
 	conversador := &fakeConversador{resposta: "ok"}
+	aberturaLonga := "Introdução: o autor apresenta a tese do livro e a lista completa dos cinco princípios. " + strings.Repeat("texto ", 80)
 	h := newChatHandlerComTextos(t, s, conversador, []reader.Unidade{
-		{Rotulo: "capítulo 1 — Abertura", Texto: "Apresentação do autor e da obra."},
+		{Rotulo: "capa", Texto: "curto"},
+		{Rotulo: "introdução", Texto: aberturaLonga},
 		{Rotulo: "capítulo 2 — O método", Texto: "A degradação das plataformas é discutida aqui com detalhes."},
 		{Rotulo: "capítulo 3 — Fecho", Texto: "Considerações finais."},
 	})
@@ -226,13 +228,13 @@ func TestChat_PerguntaUsaOLivroInteiro(t *testing.T) {
 	}
 	aguardarResposta(t, h, id, criado.ID)
 	corpo := conversador.recebidas[len(conversador.recebidas)-1].Texto
-	for _, alvo := range []string{"Sumário do livro", "capítulo 2 — O método", "degradação das plataformas", "trecho da tela"} {
+	for _, alvo := range []string{"Sumário do livro", "capítulo 2 — O método", "degradação das plataformas", "trecho da tela", "Introdução: o autor apresenta a tese"} {
 		if !strings.Contains(corpo, alvo) {
 			t.Errorf("prompt sem %q:\n%s", alvo, corpo)
 		}
 	}
-	if strings.Contains(corpo, "Apresentação do autor") {
-		t.Errorf("trecho irrelevante foi junto: %s", corpo)
+	if strings.Contains(corpo, "[capa] curto") {
+		t.Errorf("unidade curta (capa) não deveria virar abertura: %s", corpo)
 	}
 }
 
