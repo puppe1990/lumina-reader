@@ -674,3 +674,29 @@ func (s *SQLiteStore) SaveCover(capa models.Cover) error {
 	}
 	return nil
 }
+
+// TraducaoCacheada devolve a tradução guardada para o trecho (fingerprint).
+func (s *SQLiteStore) TraducaoCacheada(fingerprint string) (string, bool, error) {
+	var traducao string
+	err := s.db.QueryRow("SELECT traducao FROM translation_cache WHERE fingerprint = ?", fingerprint).Scan(&traducao)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("ler tradução em cache %q: %w", fingerprint, err)
+	}
+	return traducao, true, nil
+}
+
+// GuardarTraducao grava a tradução para reaproveitar em seleções repetidas.
+func (s *SQLiteStore) GuardarTraducao(fingerprint, traducao string) error {
+	_, err := s.db.Exec(
+		`INSERT INTO translation_cache (fingerprint, traducao) VALUES (?, ?)
+		 ON CONFLICT(fingerprint) DO UPDATE SET traducao = excluded.traducao, created_at = CURRENT_TIMESTAMP`,
+		fingerprint, traducao,
+	)
+	if err != nil {
+		return fmt.Errorf("guardar tradução %q: %w", fingerprint, err)
+	}
+	return nil
+}

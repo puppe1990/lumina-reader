@@ -12,9 +12,31 @@ import (
 	"github.com/puppe1990/lumina-reader/internal/chat"
 )
 
+type fakeCache struct {
+	itens map[string]string
+}
+
+func (f *fakeCache) TraducaoCacheada(fp string) (string, bool, error) {
+	valor, ok := f.itens[fp]
+	return valor, ok, nil
+}
+
+func (f *fakeCache) GuardarTraducao(fp, traducao string) error {
+	if f.itens == nil {
+		f.itens = map[string]string{}
+	}
+	f.itens[fp] = traducao
+	return nil
+}
+
 func newTranslateHandler(t *testing.T, conversador ConversadorRLM) *TranslateHandler {
 	t.Helper()
-	return NewTranslateHandler(cais.Config{Env: "test"}, conversador)
+	return NewTranslateHandler(cais.Config{Env: "test"}, conversador, nil)
+}
+
+func newTranslateHandlerComCache(t *testing.T, conversador ConversadorRLM, cache TraducaoCache) *TranslateHandler {
+	t.Helper()
+	return NewTranslateHandler(cais.Config{Env: "test"}, conversador, cache)
 }
 
 func pedirTraducao(h *TranslateHandler, corpo string) *httptest.ResponseRecorder {
@@ -26,9 +48,12 @@ func pedirTraducao(h *TranslateHandler, corpo string) *httptest.ResponseRecorder
 }
 
 type traducaoPost struct {
-	OK   bool   `json:"ok"`
-	ID   string `json:"id"`
-	Erro string `json:"erro"`
+	OK       bool   `json:"ok"`
+	ID       string `json:"id"`
+	Estado   string `json:"estado"`
+	Traducao string `json:"traducao"`
+	Cache    bool   `json:"cache"`
+	Erro     string `json:"erro"`
 }
 
 type traducaoGet struct {
@@ -132,5 +157,51 @@ func TestTraduzir_GetDesconhecido(t *testing.T) {
 	h.Get(rr, req, "nada")
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", rr.Code)
+	}
+}
+
+func TestTraduzir_CacheDevolveNaHoraEGuarda(t *testing.T) {
+	conversador := &fakeConversador{resposta: "degradação deliberada de plataformas"}
+	cache := &fakeCache{}
+	h := newTranslateHandlerComCache(t, conversador, cache)
+
+	// primeira vez: cria trabalho e guarda no cache ao terminar
+	rr := pedirTraducao(h, `{"texto":"enshittification"}`)
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("status = %d", rr.Code)
+	}
+	var criado traducaoPost
+	if err := json.Unmarshal(rr.Body.Bytes(), &criado); err != nil {
+		t.Fatal(err)
+	}
+	aguardarTraducao(t, h, criado.ID)
+	marca := fingerprint("enshittification")
+	if cache.itens[marca] != "degradação deliberada de plataformas" {
+		t.Fatalf("cache não guardou: %+v", cache.itens)
+	}
+
+	// segunda vez (mesmo texto, outra caixa/espaço): volta direto, sem trabalho
+	rr = pedirTraducao(h, `{"texto":"  Enshittification "}`)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 do cache", rr.Code)
+	}
+	var direto traducaoPost
+	if err := json.Unmarshal(rr.Body.Bytes(), &direto); err != nil {
+		t.Fatal(err)
+	}
+	if !direto.Cache || direto.Estado != chat.EstadoPronto || direto.Traducao != "degradação deliberada de plataformas" {
+		t.Errorf("resposta do cache = %+v", direto)
+	}
+	if len(conversador.recebidas) != 2 {
+		t.Errorf("o provedor foi chamado de novo: %d mensagens (uma tradução só)", len(conversador.recebidas))
+	}
+}
+
+func TestFingerprint_IgnoraCaixaEEspacos(t *testing.T) {
+	if fingerprint("  Olá   Mundo ") != fingerprint("olá mundo") {
+		t.Fatal("fingerprint deveria normalizar caixa e espaços")
+	}
+	if fingerprint("palavra") == fingerprint("outra") {
+		t.Fatal("textos diferentes precisam de fingerprints diferentes")
 	}
 }

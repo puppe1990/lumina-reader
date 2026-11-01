@@ -55,14 +55,18 @@ func (t *Trabalhos) Ligado() bool {
 	return t.respondedor != nil
 }
 
-// Criar dispara a pergunta em background e devolve o id para o polling.
+// Criar dispara a pergunta em background com o provedor padrão.
 func (t *Trabalhos) Criar(mensagens []Mensagem) string {
+	return t.CriarCom(t.respondedor, mensagens)
+}
+
+// CriarCom permite um provedor por trabalho (o tradutor cacheia a resposta).
+func (t *Trabalhos) CriarCom(respondedor Respondedor, mensagens []Mensagem) string {
 	id := novoID()
 	trabalho := Trabalho{ID: id, Estado: EstadoRodando, CriadoEm: t.agora()}
 	t.mu.Lock()
 	t.limpar()
 	t.itens[id] = trabalho
-	respondedor := t.respondedor
 	t.mu.Unlock()
 	if respondedor == nil {
 		return id

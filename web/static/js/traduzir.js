@@ -115,15 +115,34 @@
       var dados = await resposta.json().catch(function () {
         return {};
       });
+      if (dados.traducao) {
+        // resposta veio do cache do servidor
+        corpo.textContent = dados.traducao;
+        var acoesCache = rodape(div);
+        acoesCache.copiar.addEventListener("click", function () {
+          try {
+            navigator.clipboard.writeText(dados.traducao);
+            acoesCache.copiar.textContent = "Copiado";
+          } catch (e) {}
+        });
+        acoesCache.fechar.addEventListener("click", fecharCartao);
+        return;
+      }
       if (!resposta.ok || !dados.id) {
         corpo.textContent = dados.erro || "Não consegui traduzir agora.";
         return;
       }
       var inicio = Date.now();
-      while (Date.now() - inicio < 90000) {
+      var lentoAvisado = false;
+      while (Date.now() - inicio < 180000) {
         await new Promise(function (ok) {
           setTimeout(ok, 1200);
         });
+        if (!lentoAvisado && Date.now() - inicio > 20000) {
+          lentoAvisado = true;
+          corpo.innerHTML =
+            '<span class="material-symbols-outlined animate-spin text-[16px] text-primary">progress_activity</span>o provedor está lento, aguarde…';
+        }
         var consulta = await fetch("/traduzir/" + encodeURIComponent(dados.id));
         var estado = await consulta.json().catch(function () {
           return {};

@@ -20,7 +20,7 @@ func registerRoutes(r *cais.Router, deps Deps, cfg cais.Config) {
 	busca := handlers.NewSearchHandler(deps.Views, deps.Site, deps.Catalog, cfg, deps.Store)
 	sincronizar := handlers.NewSyncHandler(deps.Views, deps.Site, deps.Catalog, cfg, deps.Store, deps.Sincronizador)
 	chat := handlers.NewChatHandler(deps.Store, cfg, deps.ChatConversador, deps.Leitor)
-	traduzir := handlers.NewTranslateHandler(cfg, deps.ChatConversador)
+	traduzir := handlers.NewTranslateHandler(cfg, deps.ChatConversador, deps.Store)
 	naoEncontrado := handlers.NewNotFoundHandler(deps.Views, deps.Site, deps.Catalog, cfg)
 	auth := handlers.NewAuthHandler(deps.Views, deps.Store, deps.Site, deps.Store.Sessions(), cfg, deps.Catalog)
 
