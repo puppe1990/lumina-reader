@@ -77,15 +77,6 @@
     .promise.then(function (pdf) {
       pdfDoc = pdf;
       carregando.classList.add("hidden");
-      var observador = new IntersectionObserver(
-        function (entradas) {
-          entradas.forEach(function (entrada) {
-            if (!entrada.isIntersecting) return;
-            renderizarPagina(parseInt(entrada.target.getAttribute("data-pagina"), 10));
-          });
-        },
-        { rootMargin: "900px 0px" }
-      );
       for (var n = 1; n <= pdf.numPages; n++) {
         var div = document.createElement("div");
         div.className = "pdf-pagina relative w-full overflow-hidden rounded bg-white shadow-md";
@@ -96,14 +87,15 @@
         div.appendChild(canvas);
         container.appendChild(div);
         paginas.push({ numero: n, div: div, canvas: canvas, renderizada: false, renderizando: false });
-        observador.observe(div);
       }
       atualizarRotulos();
       if (paginaInicial > 1) {
         setTimeout(function () {
           irParaPagina(paginaInicial, false);
+          manterJanela(paginaInicial);
         }, 60);
       }
+      manterJanela(paginaInicial);
     })
     .catch(function (erro) {
       carregando.innerHTML = "";
@@ -140,6 +132,25 @@
     var pagina = paginas[numero - 1];
     if (!pagina) return;
     pagina.div.scrollIntoView({ block: "start", behavior: suave === false ? "auto" : "smooth" });
+  }
+
+  // Janela de renderização: só as páginas perto da atual mantêm pixels
+  // (PDFs grandes: 225 páginas renderizadas de uma vez estouram a memória).
+  var JANELA_RENDER = 2;
+  var JANELA_DESCARTE = 4;
+  function manterJanela(atual) {
+    for (var i = 0; i < paginas.length; i++) {
+      var pagina = paginas[i];
+      var distancia = Math.abs(pagina.numero - atual);
+      if (distancia <= JANELA_RENDER && !pagina.renderizada && !pagina.renderizando) {
+        renderizarPagina(pagina.numero);
+      } else if (distancia > JANELA_DESCARTE && pagina.renderizada) {
+        pagina.canvas.width = 0;
+        pagina.canvas.height = 0;
+        pagina.renderizada = false;
+        pagina.renderizando = false;
+      }
+    }
   }
 
   function atualizarRotulos() {
@@ -188,6 +199,7 @@
       if (atual === paginaAtual) return;
       paginaAtual = atual;
       atualizarRotulos();
+      manterJanela(atual);
       agendarSalvamento();
     },
     { passive: true }
