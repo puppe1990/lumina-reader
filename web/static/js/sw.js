@@ -1,4 +1,4 @@
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 const CACHE = "cais-static-v" + CACHE_VERSION;
 
 const PRECACHE = [
@@ -111,7 +111,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (url.pathname === "/static/js/amarra.js" || url.pathname.startsWith("/static/css/")) {
+  if (url.pathname.startsWith("/static/js/") || url.pathname.startsWith("/static/css/")) {
     event.respondWith(networkFirst(request, null, true));
     return;
   }
