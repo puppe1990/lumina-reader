@@ -284,19 +284,25 @@
       var selecao = window.getSelection();
       if (!selecao || selecao.isCollapsed) esconderBotao();
     });
-    document.addEventListener("keydown", function (ev) {
-      if (ev.key === "Escape") {
-        esconderBotao();
-        fecharCartao();
-      }
-    });
-    document.addEventListener(
-      "click",
-      function (ev) {
-        if (cartao && !cartao.contains(ev.target) && ev.target !== botao) fecharCartao();
-      },
-      true
-    );
     window.addEventListener("scroll", esconderBotao, { passive: true });
   }
+
+  // Fecha o cartão ao clicar fora dele (ou Escape) nos dois leitores. Em fase
+  // de captura para pegar o clique antes dos handlers da página.
+  document.addEventListener(
+    "click",
+    function (ev) {
+      if (!cartao) return;
+      if (cartao.contains(ev.target)) return;
+      if (botao && (ev.target === botao || botao.contains(ev.target))) return;
+      fecharCartao();
+    },
+    true
+  );
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") {
+      esconderBotao();
+      fecharCartao();
+    }
+  });
 })();
