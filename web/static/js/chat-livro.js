@@ -103,6 +103,36 @@
     envio.classList.toggle("opacity-60", estado);
   }
 
+  // O proxy na frente do app corta requisições longas: o POST devolve um id na
+  // hora e a resposta chega pelo polling até o trabalho terminar.
+  function aguardar(id) {
+    var inicio = Date.now();
+    return new Promise(function (resolve) {
+      async function passo() {
+        if (Date.now() - inicio > 180000) {
+          resolve({ erro: "O provedor demorou demais para responder; tente de novo." });
+          return;
+        }
+        try {
+          var resposta = await fetch("/livros/" + livroId + "/chat/" + encodeURIComponent(id));
+          var dados = await resposta.json().catch(function () {
+            return {};
+          });
+          if (dados.estado && dados.estado !== "rodando") {
+            resolve(dados);
+            return;
+          }
+          if (!resposta.ok) {
+            resolve({ erro: dados.erro || "Perdi a pergunta no caminho; tente de novo." });
+            return;
+          }
+        } catch (e) {}
+        setTimeout(passo, 1400);
+      }
+      passo();
+    });
+  }
+
   async function perguntar(texto) {
     var pergunta = texto.trim();
     if (!pergunta || enviando) return;
@@ -125,15 +155,21 @@
       var dados = await resposta.json().catch(function () {
         return {};
       });
-      carregando.remove();
-      if (!resposta.ok || !dados.resposta) {
-        aviso(dados.erro || "Não consegui responder agora. Tente de novo.");
+      if (!resposta.ok || !dados.id) {
+        carregando.remove();
+        aviso(dados.erro || "Não consegui perguntar agora. Tente de novo.");
         return;
       }
-      bolha("assistant", dados.resposta);
-      historico.push({ papel: "user", texto: pergunta });
-      historico.push({ papel: "assistant", texto: dados.resposta });
-      if (historico.length > 8) historico = historico.slice(-8);
+      var final = await aguardar(dados.id);
+      carregando.remove();
+      if (final.estado === "pronto" && final.resposta) {
+        bolha("assistant", final.resposta);
+        historico.push({ papel: "user", texto: pergunta });
+        historico.push({ papel: "assistant", texto: final.resposta });
+        if (historico.length > 8) historico = historico.slice(-8);
+      } else {
+        aviso(final.erro || "O provedor não respondeu; tente de novo.");
+      }
     } catch (erro) {
       carregando.remove();
       aviso("Não consegui falar com o servidor: " + (erro && erro.message ? erro.message : "erro de rede"));

@@ -3,11 +3,8 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/puppe1990/amarra-cais/pkg/cais"
 	"github.com/puppe1990/amarra-cais/pkg/cais/httpx"
@@ -22,17 +19,20 @@ type ConversadorRLM interface {
 	Responder(ctx context.Context, mensagens []chat.Mensagem) (string, error)
 }
 
+// ChatHandler responde a pergunta em background: o POST devolve um id na hora
+// (o proxy na frente do app corta requisições longas) e o GET devolve o estado
+// até a resposta do LLM chegar.
 type ChatHandler struct {
-	store       store.Store
-	cfg         cais.Config
-	respondedor ConversadorRLM
+	store     store.Store
+	cfg       cais.Config
+	trabalhos *chat.Trabalhos
 }
 
 func NewChatHandler(s store.Store, cfg cais.Config, respondedor ConversadorRLM) *ChatHandler {
-	return &ChatHandler{store: s, cfg: cfg, respondedor: respondedor}
+	return &ChatHandler{store: s, cfg: cfg, trabalhos: chat.NovosTrabalhos(respondedor)}
 }
 
-// Post responde a pergunta do leitor com base no trecho atual do livro.
+// Post valida a pergunta, dispara o trabalho e devolve o id do polling.
 func (h *ChatHandler) Post(w http.ResponseWriter, r *http.Request, bookID int64) {
 	if err := httpx.ParseFormOrJSON(r); err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "erro": "corpo inválido"})
@@ -43,7 +43,7 @@ func (h *ChatHandler) Post(w http.ResponseWriter, r *http.Request, bookID int64)
 		respondJSON(w, http.StatusUnprocessableEntity, map[string]any{"ok": false, "erro": "escreva uma pergunta"})
 		return
 	}
-	if h.respondedor == nil {
+	if !h.trabalhos.Ligado() {
 		respondJSON(w, http.StatusFailedDependency, map[string]any{
 			"ok":   false,
 			"erro": "O chat ainda não está configurado no servidor (falta LUMINA_CHAT_API_KEY).",
@@ -69,37 +69,26 @@ func (h *ChatHandler) Post(w http.ResponseWriter, r *http.Request, bookID int64)
 		return
 	}
 
-	ctx, cancelar := context.WithTimeout(r.Context(), 130*time.Second)
-	defer cancelar()
-	resposta, err := h.respondedor.Responder(ctx, mensagens)
-	if err != nil {
-		status, mensagem := erroChatAmigavel(err)
-		respondJSON(w, status, map[string]any{"ok": false, "erro": mensagem})
-		return
-	}
-	respondJSON(w, http.StatusOK, map[string]any{"ok": true, "resposta": resposta})
+	id := h.trabalhos.Criar(mensagens)
+	respondJSON(w, http.StatusAccepted, map[string]any{"ok": true, "id": id})
 }
 
-// erroChatAmigavel traduz a falha do provedor sem vazar chave nem stack.
-// Tudo sai como 424 (4xx): o proxy na frente do app troca respostas 5xx por
-// página de erro e o navegador perderia a mensagem em JSON.
-func erroChatAmigavel(err error) (int, string) {
-	var provedor *chat.ErroProvedor
-	if errors.As(err, &provedor) {
-		switch provedor.Status {
-		case http.StatusUnauthorized, http.StatusForbidden:
-			return http.StatusFailedDependency, "O provedor recusou a chave configurada no servidor."
-		case http.StatusNotFound:
-			return http.StatusFailedDependency, "O modelo configurado não está disponível para esta conta."
-		case http.StatusTooManyRequests:
-			return http.StatusFailedDependency, "O provedor está limitando as requisições; tente de novo em instantes."
-		}
-		return http.StatusFailedDependency, "O provedor respondeu com erro " + strconv.Itoa(provedor.Status) + "."
+// Get devolve o estado da pergunta: rodando, pronta (com resposta) ou erro.
+func (h *ChatHandler) Get(w http.ResponseWriter, r *http.Request, bookID int64, trabalhoID string) {
+	_ = bookID
+	trabalho, ok := h.trabalhos.Buscar(trabalhoID)
+	if !ok {
+		respondJSON(w, http.StatusNotFound, map[string]any{"ok": false, "erro": "pergunta não encontrada (expirou?)"})
+		return
 	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		return http.StatusFailedDependency, "O provedor demorou demais para responder; tente de novo."
+	corpo := map[string]any{"ok": true, "estado": trabalho.Estado}
+	if trabalho.Resposta != "" {
+		corpo["resposta"] = trabalho.Resposta
 	}
-	return http.StatusFailedDependency, "Não consegui falar com o provedor agora: " + err.Error()
+	if trabalho.Erro != "" {
+		corpo["erro"] = trabalho.Erro
+	}
+	respondJSON(w, http.StatusOK, corpo)
 }
 
 // lerHistorico aceita o JSON do navegador e ignora o que não fizer sentido.

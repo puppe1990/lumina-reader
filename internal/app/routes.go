@@ -42,6 +42,7 @@ func registerRoutes(r *cais.Router, deps Deps, cfg cais.Config) {
 	r.Get("/livros/{id}/pdf", exigir(cais.IntParam("id", leitor.PDF)))
 	r.Get("/livros/{id}/busca", exigir(cais.IntParam("id", leitor.Search)))
 	r.Post("/livros/{id}/chat", exigir(cais.IntParam("id", chat.Post)))
+	r.Get("/livros/{id}/chat/{job}", exigir(cais.IntStringParams("id", "job", chat.Get)))
 	r.Get("/livros/{id}/arquivo", exigir(cais.IntParam("id", book.File)))
 	r.Get("/livros/{id}/recurso/{nome...}", exigir(cais.IntStringParams("id", "nome", book.Resource)))
 	r.Post("/livros/{id}/progresso", exigir(cais.IntParam("id", leitor.Progress)))
