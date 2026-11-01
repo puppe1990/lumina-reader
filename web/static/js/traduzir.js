@@ -11,7 +11,31 @@
   var tradutor = null;
   var tradutorIdioma = "";
   var detector = null;
+  var detectorPedido = false;
   var CHAVE_CACHE = "lumina-traducao:";
+
+  // O create (do tradutor e do detector) precisa de gesto do usuário para
+  // baixar o modelo: aquecemos o detector no primeiro clique/toque na página.
+  function aquecerDetector() {
+    if (detector || detectorPedido || typeof window.LanguageDetector === "undefined") return;
+    detectorPedido = true;
+    window.LanguageDetector.create()
+      .then(function (criado) {
+        detector = criado;
+      })
+      .catch(function () {});
+  }
+  document.addEventListener("pointerdown", aquecerDetector, { once: true, passive: true });
+
+  // Heurística sem modelo: heurística de palavras/diacríticos típicos do
+  // português — evita "traduzir" um trecho que já está em português.
+  var MARCAS_PT = /(ção|ções|não|é |ão |que |para |como |com |uma |dos |das |você|também|até |já |pela|pelo|muito|mais)/i;
+  var MARCAS_EN = /( the | and | of | to | in | is | that | with | for | you | this )/i;
+  function parecePortugues(texto) {
+    var amostra = " " + texto.toLowerCase() + " ";
+    if (MARCAS_EN.test(amostra)) return false;
+    return MARCAS_PT.test(amostra);
+  }
 
   function suportado() {
     return typeof window.Translator !== "undefined";
@@ -125,15 +149,13 @@
 
   // A API exige o par de idiomas; detectamos o idioma do trecho e caímos em
   // inglês quando o detector não ajuda.
+  // Só usa o detector quando ele já está pronto; senão assume inglês (o acervo
+  // é majoritariamente em inglês).
   async function idiomaDoTexto(texto) {
+    if (!detector) return "en";
     try {
-      if (!detector && typeof window.LanguageDetector !== "undefined") {
-        detector = await window.LanguageDetector.create();
-      }
-      if (detector) {
-        var achados = await detector.detect(texto);
-        if (achados && achados[0] && achados[0].detectedLanguage) return achados[0].detectedLanguage;
-      }
+      var achados = await detector.detect(texto);
+      if (achados && achados[0] && achados[0].detectedLanguage) return achados[0].detectedLanguage;
     } catch (e) {}
     return "en";
   }
@@ -198,6 +220,10 @@
     div.appendChild(status);
 
     try {
+      if (parecePortugues(texto)) {
+        status.textContent = "O trecho já está em português.";
+        return;
+      }
       var idioma = await idiomaDoTexto(texto);
       if (idioma && idioma.toLowerCase().startsWith("pt")) {
         status.textContent = "O trecho já está em português.";
