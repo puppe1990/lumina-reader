@@ -83,11 +83,14 @@
         var slide = document.createElement("div");
         slide.className = "pdf-pagina flex h-full w-full shrink-0 items-center justify-center";
         slide.setAttribute("data-pagina", String(n));
+        var caixa = document.createElement("div");
+        caixa.className = "relative";
         var canvas = document.createElement("canvas");
-        canvas.className = "pdf-folha max-h-full max-w-full rounded bg-white shadow-md";
-        slide.appendChild(canvas);
+        canvas.className = "pdf-folha block h-full w-full rounded bg-white shadow-md";
+        caixa.appendChild(canvas);
+        slide.appendChild(caixa);
         trilho.appendChild(slide);
-        paginas.push({ numero: n, div: slide, canvas: canvas, renderizada: false, renderizando: false });
+        paginas.push({ numero: n, div: slide, caixa: caixa, canvas: canvas, renderizada: false, renderizando: false });
       }
       atualizarRotulos();
       irParaPagina(paginaInicial, false);
@@ -100,6 +103,39 @@
       aviso.textContent = "Não consegui abrir este PDF: " + (erro && erro.message ? erro.message : "erro desconhecido");
       carregando.appendChild(aviso);
     });
+
+  // Spans invisíveis por cima do canvas: permitem selecionar o texto (traduzir
+  // a seleção). O pdf.js 3 posiciona tudo pelo CSS var --scale-factor.
+  function montarCamadaTexto(pagina, pg) {
+    var anterior = pagina.caixa.querySelector(".textLayer");
+    if (anterior) anterior.remove();
+    var camada = document.createElement("div");
+    camada.className = "textLayer";
+    camada.style.setProperty("--scale-factor", String(pagina.escalaCss || 1));
+    pagina.caixa.appendChild(camada);
+    try {
+      if (typeof pg.streamTextContent === "function") {
+        return pdfjsLib
+          .renderTextLayer({
+            textContentSource: pg.streamTextContent({ includeMarkedContent: false }),
+            container: camada,
+            viewport: pg.getViewport({ scale: pagina.escalaCss || 1 }),
+            textDivs: [],
+          })
+          .promise.catch(function () {});
+      }
+      return pg.getTextContent().then(function (conteudo) {
+        return pdfjsLib.renderTextLayer({
+          textContentSource: conteudo,
+          container: camada,
+          viewport: pg.getViewport({ scale: pagina.escalaCss || 1 }),
+          textDivs: [],
+        }).promise;
+      }).catch(function () {});
+    } catch (e) {
+      return Promise.resolve();
+    }
+  }
 
   // A página é encaixada na tela (fit page): o texto fica legível sem zoom e a
   // virada mostra a página inteira, como num e-reader.
@@ -116,12 +152,16 @@
         var alturaTela = Math.max(240, viewport.clientHeight - 28);
         var escala = Math.min(larguraTela / base.width, alturaTela / base.height);
         var tela = pg.getViewport({ scale: escala * dpr });
+        pagina.escalaCss = escala;
         pagina.canvas.width = Math.floor(tela.width);
         pagina.canvas.height = Math.floor(tela.height);
-        // Tamanho CSS em px lógicos para o canvas caber exato na tela.
-        pagina.canvas.style.width = Math.floor(tela.width / dpr) + "px";
-        pagina.canvas.style.height = Math.floor(tela.height / dpr) + "px";
-        return pg.render({ canvasContext: pagina.canvas.getContext("2d"), viewport: tela }).promise;
+        // A caixa tem o tamanho CSS exato da página; canvas e camada de texto
+        // ocupam 100% dela.
+        pagina.caixa.style.width = Math.floor(tela.width / dpr) + "px";
+        pagina.caixa.style.height = Math.floor(tela.height / dpr) + "px";
+        return pg.render({ canvasContext: pagina.canvas.getContext("2d"), viewport: tela }).promise.then(function () {
+          return montarCamadaTexto(pagina, pg);
+        });
       })
       .then(function () {
         pagina.renderizada = true;
@@ -163,6 +203,8 @@
       } else if (distancia > JANELA_DESCARTE && pagina.renderizada) {
         pagina.canvas.width = 0;
         pagina.canvas.height = 0;
+        var camadaAntiga = pagina.caixa.querySelector(".textLayer");
+        if (camadaAntiga) camadaAntiga.remove();
         pagina.renderizada = false;
         pagina.renderizando = false;
       }

@@ -594,6 +594,33 @@
     filter: brightness(0.85);
   }
 
+  /* Camada de texto do PDF (pdf.js): ficam spans invisíveis por cima do canvas
+     para permitir selecionar (traduzir/realçar). O --scale-factor é setado no
+     JS; sem ele o pdf.js posiciona tudo no canto. */
+  .textLayer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    line-height: 1;
+    text-size-adjust: none;
+    transform-origin: 0 0;
+    z-index: 1;
+  }
+  .textLayer span,
+  .textLayer br {
+    position: absolute;
+    white-space: pre;
+    transform-origin: 0% 0%;
+    color: transparent;
+    cursor: text;
+  }
+  .textLayer ::selection {
+    background: rgb(144 73 0 / 0.28);
+  }
+  html[data-canvas="noite"] .textLayer ::selection {
+    background: rgb(255 255 255 / 0.3);
+  }
+
   /* Leitor de PDF (pdf.js): uma página por tela na horizontal; no tema Noite a
      arte é invertida para não ofuscar. */
   .pdf-folha {

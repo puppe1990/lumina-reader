@@ -386,6 +386,12 @@
         var cor = alvo.getAttribute("data-destaque");
         var acao = alvo.getAttribute("data-acao");
 
+        if (acao === "traduzir") {
+          var retangulo = selecaoAtual.getRangeAt(0).getBoundingClientRect();
+          esconderBarra();
+          if (window.luminaTraduzir) window.luminaTraduzir(selecaoAtual.toString(), retangulo);
+          return;
+        }
         if (acao === "copiar") {
           try {
             navigator.clipboard.writeText(selecaoAtual.toString());

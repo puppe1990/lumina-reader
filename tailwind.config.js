@@ -19,7 +19,13 @@ function shippedKitContent() {
 
 /** @type {import("tailwindcss").Config} */
 module.exports = {
-  content: ["./web/templates/**/*.html", "./web/static/js/lumina.js", ...shippedKitContent()],
+  content: [
+    "./web/templates/**/*.html",
+    // o JS do leitor monta classes em runtime (toast, chat, camada de texto do
+    // PDF); sem escanear esses arquivos o Tailwind poda as classes.
+    "./web/static/js/*.js",
+    ...shippedKitContent(),
+  ],
   safelist: [
     "cais-password-wrap",
     "cais-password-toggle",
