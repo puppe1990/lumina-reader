@@ -33,6 +33,7 @@ func registerRoutes(r *cais.Router, deps Deps, cfg cais.Config) {
 	r.Post("/login", loginLimit.Middleware(http.HandlerFunc(auth.LoginPost)).ServeHTTP)
 	r.Post("/logout", auth.LogoutPost)
 	r.Get("/perfil", exigir(perfil.Page))
+	r.Post("/perfil/email", exigir(perfil.ChangeEmail))
 	r.Post("/perfil/senha", exigir(perfil.ChangePassword))
 	r.Post("/locale", handlers.PostLocale(cfg))
 

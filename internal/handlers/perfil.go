@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -54,6 +55,52 @@ func (h *ProfileHandler) render(w http.ResponseWriter, r *http.Request, extra ma
 // Page mostra o formulário de troca de senha.
 func (h *ProfileHandler) Page(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, nil, 0)
+}
+
+// ChangeEmail troca o email de login (pede a senha atual para confirmar).
+func (h *ProfileHandler) ChangeEmail(w http.ResponseWriter, r *http.Request) {
+	if err := httpx.ParseFormOrJSON(r); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	userID, ok := session.UserID(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	user, err := h.store.GetUser(userID)
+	if err != nil {
+		h.render(w, r, map[string]any{"Errors": validate.FieldErrors{"email": "Não consegui carregar sua conta."}}, http.StatusInternalServerError)
+		return
+	}
+
+	novo := strings.ToLower(strings.TrimSpace(r.FormValue("novo_email")))
+	senha := r.FormValue("senha_email")
+	erros := validate.FieldErrors{}
+	if err := validate.Email(novo); err != nil {
+		erros["novo_email"] = "Digite um email válido."
+	}
+	if novo != "" && strings.EqualFold(novo, user.Email) {
+		erros["novo_email"] = "É o mesmo email de agora."
+	}
+	if !session.VerifyPassword(user.PasswordHash, senha) {
+		erros["senha_email"] = "A senha não confere."
+	}
+	if len(erros) == 0 {
+		if err := h.store.UpdateUserEmail(userID, novo); err != nil {
+			if errors.Is(err, store.ErrEmailTaken) {
+				erros["novo_email"] = "Este email já é usado por outra conta."
+			} else {
+				erros["novo_email"] = "Não consegui salvar o email."
+			}
+		}
+	}
+	if len(erros) > 0 {
+		h.render(w, r, map[string]any{"Errors": erros}, http.StatusUnprocessableEntity)
+		return
+	}
+	flash.Set(w, "notice", "Email atualizado para "+novo+".", h.cfg.CookieSecure())
+	http.Redirect(w, r, "/perfil", http.StatusSeeOther)
 }
 
 // ChangePassword valida a senha atual e grava a nova.

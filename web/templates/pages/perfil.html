@@ -18,6 +18,16 @@
   </div>
 
   <div class="mt-5 rounded-2xl bg-surface-container-low p-6 shadow-sm">
+    <h2 class="mb-4 font-serif text-[17px] font-semibold text-on-surface">Trocar o email</h2>
+    <.form action="/perfil/email" method="post">
+      <.input name="novo_email" type="email" label="Email novo" value="" error="{{ fieldError .Errors "novo_email" }}" autocomplete="email" required="required" />
+      <.password name="senha_email" label="Senha atual" error="{{ fieldError .Errors "senha_email" }}" autocomplete="current-password" required="required" />
+      <.button type="submit">Salvar o email novo</.button>
+    </.form>
+    <p class="mt-3 text-[11px] leading-4 text-secondary">O email é o seu login — na próxima entrada use o novo.</p>
+  </div>
+
+  <div class="mt-5 rounded-2xl bg-surface-container-low p-6 shadow-sm">
     <h2 class="mb-4 font-serif text-[17px] font-semibold text-on-surface">Trocar a senha</h2>
     <.form action="/perfil/senha" method="post">
       <.password name="atual" label="Senha atual" error="{{ fieldError .Errors "atual" }}" autocomplete="current-password" required="required" />

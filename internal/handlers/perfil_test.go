@@ -155,3 +155,73 @@ func TestStore_UpdateUserPassword(t *testing.T) {
 		t.Errorf("GetUser de id inexistente deveria falhar")
 	}
 }
+
+func pedirTrocaEmail(h *ProfileHandler, id int64, form url.Values) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, "/perfil/email", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = session.WithUserID(req, id)
+	rr := httptest.NewRecorder()
+	h.ChangeEmail(rr, req)
+	return rr
+}
+
+func TestPerfil_TrocaEmailComSucesso(t *testing.T) {
+	h, s, id := newProfileHandler(t)
+	rr := pedirTrocaEmail(h, id, url.Values{"novo_email": {"  Matheus.Puppe@Gmail.com "}, "senha_email": {"password"}})
+	if rr.Code != http.StatusSeeOther || rr.Header().Get("Location") != "/perfil" {
+		t.Fatalf("status = %d, location %q", rr.Code, rr.Header().Get("Location"))
+	}
+	user, err := s.GetUser(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.Email != "matheus.puppe@gmail.com" {
+		t.Errorf("email = %q (minúsculo e sem espaços)", user.Email)
+	}
+	if _, err := s.FindUserByEmail("dono@example.com"); err == nil {
+		t.Errorf("email antigo ainda encontra a conta")
+	}
+	if _, err := s.FindUserByEmail("matheus.puppe@gmail.com"); err != nil {
+		t.Errorf("email novo não encontra a conta: %v", err)
+	}
+}
+
+func TestPerfil_TrocaEmailValidacoes(t *testing.T) {
+	casos := []struct {
+		nome   string
+		form   url.Values
+		trecho string
+	}{
+		{"email inválido", url.Values{"novo_email": {"sem-arroba"}, "senha_email": {"password"}}, "email válido"},
+		{"mesmo email", url.Values{"novo_email": {"dono@example.com"}, "senha_email": {"password"}}, "mesmo email de agora"},
+		{"senha errada", url.Values{"novo_email": {"novo@example.com"}, "senha_email": {"errada"}}, "senha não confere"},
+	}
+	for _, caso := range casos {
+		t.Run(caso.nome, func(t *testing.T) {
+			h, s, id := newProfileHandler(t)
+			rr := pedirTrocaEmail(h, id, caso.form)
+			if rr.Code != http.StatusUnprocessableEntity {
+				t.Fatalf("status = %d, want 422", rr.Code)
+			}
+			if !strings.Contains(rr.Body.String(), caso.trecho) {
+				t.Errorf("faltou %q", caso.trecho)
+			}
+			user, _ := s.GetUser(id)
+			if user.Email != "dono@example.com" {
+				t.Errorf("email não deveria mudar: %q", user.Email)
+			}
+		})
+	}
+}
+
+func TestPerfil_TrocaEmailJaUsado(t *testing.T) {
+	h, s, id := newProfileHandler(t)
+	hash, _ := session.HashPassword("outraSenha123")
+	if _, err := s.CreateUser("ocupado@example.com", hash); err != nil {
+		t.Fatal(err)
+	}
+	rr := pedirTrocaEmail(h, id, url.Values{"novo_email": {"ocupado@example.com"}, "senha_email": {"password"}})
+	if rr.Code != http.StatusUnprocessableEntity || !strings.Contains(rr.Body.String(), "já é usado") {
+		t.Fatalf("status = %d, want 422 com 'já é usado'", rr.Code)
+	}
+}

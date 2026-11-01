@@ -24,6 +24,7 @@ var ErrUserNotFound = errors.New("usuário não encontrado")
 type Store interface {
 	FindUserByEmail(email string) (models.User, error)
 	GetUser(id int64) (models.User, error)
+	UpdateUserEmail(userID int64, email string) error
 	UpdateUserPassword(userID int64, passwordHash string) error
 	CreateUser(email, passwordHash string) (int64, error)
 	CreatePasswordResetToken(userID int64) (string, error)
@@ -150,6 +151,21 @@ func (s *SQLiteStore) GetUser(id int64) (models.User, error) {
 		return models.User{}, fmt.Errorf("get user %d: %w", id, err)
 	}
 	return u, nil
+}
+
+// UpdateUserEmail troca o email do usuário logado (o login passa a ser ele).
+func (s *SQLiteStore) UpdateUserEmail(userID int64, email string) error {
+	resultado, err := s.db.Exec("UPDATE users SET email = ? WHERE id = ?", email, userID)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") {
+			return ErrEmailTaken
+		}
+		return fmt.Errorf("trocar email do usuário %d: %w", userID, err)
+	}
+	if linhas, err := resultado.RowsAffected(); err == nil && linhas == 0 {
+		return ErrUserNotFound
+	}
+	return nil
 }
 
 // UpdateUserPassword troca o hash da senha do usuário logado.
