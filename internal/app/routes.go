@@ -19,7 +19,7 @@ func registerRoutes(r *cais.Router, deps Deps, cfg cais.Config) {
 	colecoes := handlers.NewCollectionsHandler(deps.Views, deps.Site, deps.Catalog, cfg, deps.Store)
 	busca := handlers.NewSearchHandler(deps.Views, deps.Site, deps.Catalog, cfg, deps.Store)
 	sincronizar := handlers.NewSyncHandler(deps.Views, deps.Site, deps.Catalog, cfg, deps.Store, deps.Sincronizador)
-	chat := handlers.NewChatHandler(deps.Store, cfg, deps.ChatConversador)
+	chat := handlers.NewChatHandler(deps.Store, cfg, deps.ChatConversador, deps.Leitor)
 	naoEncontrado := handlers.NewNotFoundHandler(deps.Views, deps.Site, deps.Catalog, cfg)
 	auth := handlers.NewAuthHandler(deps.Views, deps.Store, deps.Site, deps.Store.Sessions(), cfg, deps.Catalog)
 

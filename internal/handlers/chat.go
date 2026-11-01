@@ -10,6 +10,8 @@ import (
 	"github.com/puppe1990/amarra-cais/pkg/cais/httpx"
 
 	"github.com/puppe1990/lumina-reader/internal/chat"
+	"github.com/puppe1990/lumina-reader/internal/models"
+	"github.com/puppe1990/lumina-reader/internal/reader"
 	"github.com/puppe1990/lumina-reader/internal/store"
 )
 
@@ -19,6 +21,12 @@ type ConversadorRLM interface {
 	Responder(ctx context.Context, mensagens []chat.Mensagem) (string, error)
 }
 
+// TextosDoLivro entrega o livro inteiro em unidades pesquisáveis (capítulo no
+// EPUB, página no PDF) para o chat responder sobre a obra toda.
+type TextosDoLivro interface {
+	TextoDoLivro(ctx context.Context, book models.Book) ([]reader.Unidade, error)
+}
+
 // ChatHandler responde a pergunta em background: o POST devolve um id na hora
 // (o proxy na frente do app corta requisições longas) e o GET devolve o estado
 // até a resposta do LLM chegar.
@@ -26,10 +34,11 @@ type ChatHandler struct {
 	store     store.Store
 	cfg       cais.Config
 	trabalhos *chat.Trabalhos
+	textos    TextosDoLivro
 }
 
-func NewChatHandler(s store.Store, cfg cais.Config, respondedor ConversadorRLM) *ChatHandler {
-	return &ChatHandler{store: s, cfg: cfg, trabalhos: chat.NovosTrabalhos(respondedor)}
+func NewChatHandler(s store.Store, cfg cais.Config, respondedor ConversadorRLM, textos TextosDoLivro) *ChatHandler {
+	return &ChatHandler{store: s, cfg: cfg, trabalhos: chat.NovosTrabalhos(respondedor), textos: textos}
 }
 
 // Post valida a pergunta, dispara o trabalho e devolve o id do polling.
@@ -56,10 +65,13 @@ func (h *ChatHandler) Post(w http.ResponseWriter, r *http.Request, bookID int64)
 		return
 	}
 
+	sumario, trechos := h.recortarLivro(r.Context(), livro, pergunta)
 	mensagens, err := chat.MontarMensagens(chat.Pedido{
 		Livro:     livro.Title,
 		Autor:     livro.Author,
 		Posicao:   r.FormValue("posicao"),
+		Sumario:   sumario,
+		Trechos:   trechos,
 		Contexto:  r.FormValue("contexto"),
 		Pergunta:  pergunta,
 		Historico: lerHistorico(r.FormValue("historico")),
@@ -89,6 +101,31 @@ func (h *ChatHandler) Get(w http.ResponseWriter, r *http.Request, bookID int64, 
 		corpo["erro"] = trabalho.Erro
 	}
 	respondJSON(w, http.StatusOK, corpo)
+}
+
+// recortarLivro lê o livro inteiro e separa o sumário (só EPUB) dos trechos
+// que respondem à pergunta. Formato sem texto (mobi/azw3) devolve vazio e o
+// modelo cai no trecho atual enviado pelo navegador.
+func (h *ChatHandler) recortarLivro(ctx context.Context, livro models.Book, pergunta string) ([]string, []chat.Trecho) {
+	if h.textos == nil {
+		return nil, nil
+	}
+	unidades, err := h.textos.TextoDoLivro(ctx, livro)
+	if err != nil || len(unidades) == 0 {
+		return nil, nil
+	}
+	todos := make([]chat.Trecho, 0, len(unidades))
+	for _, unidade := range unidades {
+		todos = append(todos, chat.Trecho{Rotulo: unidade.Rotulo, Texto: unidade.Texto})
+	}
+	var sumario []string
+	if livro.Format == "epub" {
+		sumario = make([]string, 0, len(unidades))
+		for _, unidade := range unidades {
+			sumario = append(sumario, unidade.Rotulo)
+		}
+	}
+	return sumario, chat.SelecionarTrechos(todos, pergunta, chat.MaxTrechos)
 }
 
 // lerHistorico aceita o JSON do navegador e ignora o que não fizer sentido.

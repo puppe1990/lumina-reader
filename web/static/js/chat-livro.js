@@ -16,7 +16,7 @@
   var historico = [];
   var enviando = false;
 
-  var SUGESTOES = ["Resuma este trecho", "Explique com outras palavras", "O que o autor quis dizer aqui?"];
+  var SUGESTOES = ["Resuma o livro", "Qual é a ideia central?", "O que o autor diz sobre "];
 
   function token() {
     var meta = document.querySelector('meta[name="csrf-token"]');
@@ -196,5 +196,5 @@
   }).observe(raiz, { attributes: true, attributeFilter: ["open"] });
 
   montarSugestoes();
-  aviso("Pergunte o que quiser sobre o trecho que você está lendo — respondo com base no livro.");
+  aviso("Pergunte o que quiser sobre o livro inteiro — respondo com base no texto dele.");
 })();

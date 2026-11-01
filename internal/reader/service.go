@@ -51,6 +51,10 @@ type Service struct {
 	// arquivo inteiro do B2, e uma grade aberta com dezenas de capas já derrubou
 	// o processo (memória + shutdown lento).
 	semaforoCapa chan struct{}
+	// textoCache guarda o texto extraído dos PDFs (usado pelo chat).
+	textoCache *cacheTexto
+	// extrairPDF é injetável para os testes (o real roda pdftotext).
+	extrairPDF func(ctx context.Context, caminho string) (string, error)
 }
 
 const (
@@ -64,6 +68,8 @@ func New(remote Remote, store ChapterStore, cacheDir string) *Service {
 		store:        store,
 		cacheDir:     cacheDir,
 		semaforoCapa: make(chan struct{}, extracoesCapaSimultaneas),
+		textoCache:   novoCacheTexto(),
+		extrairPDF:   extrairTextoPDF,
 	}
 }
 
