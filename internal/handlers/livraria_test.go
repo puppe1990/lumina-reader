@@ -17,7 +17,7 @@ func seedLivro(t *testing.T, s store.Store, key, titulo, autor, category, format
 	if _, err := s.UpsertBook(models.Book{
 		RemoteKey: key, Title: titulo, Author: autor, Category: category, Format: format,
 		SizeBytes: 1024, SHA1: "sha-" + key,
-	}); err != nil {
+	}, nil); err != nil {
 		t.Fatal(err)
 	}
 	livro, err := s.FindBookByKey(key)

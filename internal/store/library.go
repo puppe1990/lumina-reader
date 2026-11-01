@@ -24,7 +24,10 @@ const bookColumns = `b.id, b.remote_key, b.title, b.author, b.category, b.format
 
 // UpsertBook insere ou atualiza os metadados derivados do caminho remoto e
 // informa se o livro é novo (o relatório de sincronização conta os dois casos).
-func (s *SQLiteStore) UpsertBook(book models.Book) (bool, error) {
+// Quando a chave não existe mais mas o SHA-1 casa com um livro ignorado na
+// listagem atual (vivas), a linha é re-chaveada: renomear no B2 não perde
+// progresso, marcador, notas, favorito nem capa.
+func (s *SQLiteStore) UpsertBook(book models.Book, vivas map[string]bool) (bool, error) {
 	var id int64
 	err := s.db.QueryRow("SELECT id FROM books WHERE remote_key = ?", book.RemoteKey).Scan(&id)
 	if err == nil {
@@ -40,6 +43,17 @@ func (s *SQLiteStore) UpsertBook(book models.Book) (bool, error) {
 	if !errors.Is(err, sql.ErrNoRows) {
 		return false, fmt.Errorf("procurar livro %q: %w", book.RemoteKey, err)
 	}
+
+	if book.SHA1 != "" && len(vivas) > 0 {
+		renomeado, err := s.rechavearPorSHA1(book, vivas)
+		if err != nil {
+			return false, err
+		}
+		if renomeado {
+			return false, nil
+		}
+	}
+
 	_, err = s.db.Exec(
 		`INSERT INTO books (remote_key, title, author, category, format, size_bytes, sha1) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		book.RemoteKey, book.Title, book.Author, book.Category, book.Format, book.SizeBytes, book.SHA1,
@@ -48,6 +62,94 @@ func (s *SQLiteStore) UpsertBook(book models.Book) (bool, error) {
 		return false, fmt.Errorf("inserir livro %q: %w", book.RemoteKey, err)
 	}
 	return true, nil
+}
+
+// rechavearPorSHA1 move para a chave nova a linha cuja chave antiga saiu da
+// listagem (renomeação/deduplicação do acervo). Devolve false quando não há
+// linha órfã com o mesmo conteúdo.
+func (s *SQLiteStore) rechavearPorSHA1(book models.Book, vivas map[string]bool) (bool, error) {
+	rows, err := s.db.Query("SELECT id, remote_key FROM books WHERE sha1 = ? ORDER BY id", book.SHA1)
+	if err != nil {
+		return false, fmt.Errorf("procurar livro por sha1 %q: %w", book.SHA1, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var candidatos []int64
+	for rows.Next() {
+		var id int64
+		var chave string
+		if err := rows.Scan(&id, &chave); err != nil {
+			return false, fmt.Errorf("ler candidato de sha1 %q: %w", book.SHA1, err)
+		}
+		if !vivas[chave] {
+			candidatos = append(candidatos, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return false, fmt.Errorf("candidatos de sha1 %q: %w", book.SHA1, err)
+	}
+	if len(candidatos) == 0 {
+		return false, nil
+	}
+	id := candidatos[0]
+	_, err = s.db.Exec(
+		`UPDATE books SET remote_key = ?, title = ?, author = ?, category = ?, format = ?, size_bytes = ?, sha1 = ? WHERE id = ?`,
+		book.RemoteKey, book.Title, book.Author, book.Category, book.Format, book.SizeBytes, book.SHA1, id,
+	)
+	if err != nil {
+		return false, fmt.Errorf("re-chavear livro %d para %q: %w", id, book.RemoteKey, err)
+	}
+	return true, nil
+}
+
+// PruneBooks remove da estante os livros cujo arquivo saiu do balde, junto com
+// capítulos, progresso, notas, favorito e capa. O acervo é a fonte da verdade.
+func (s *SQLiteStore) PruneBooks(vivas map[string]bool) (int, error) {
+	rows, err := s.db.Query("SELECT id, remote_key FROM books")
+	if err != nil {
+		return 0, fmt.Errorf("listar livros para poda: %w", err)
+	}
+	var orfaos []int64
+	for rows.Next() {
+		var id int64
+		var chave string
+		if err := rows.Scan(&id, &chave); err != nil {
+			_ = rows.Close()
+			return 0, fmt.Errorf("ler livro para poda: %w", err)
+		}
+		if !vivas[chave] {
+			orfaos = append(orfaos, id)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return 0, fmt.Errorf("fechar listagem de poda: %w", err)
+	}
+	if len(orfaos) == 0 {
+		return 0, nil
+	}
+
+	tx, err := s.db.Raw().Begin()
+	if err != nil {
+		return 0, fmt.Errorf("abrir transação de poda: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	removidos := 0
+	for _, id := range orfaos {
+		for _, tabela := range []string{"book_chapters", "reading_progress", "book_notes", "book_favorites", "book_covers"} {
+			if _, err := tx.Exec("DELETE FROM "+tabela+" WHERE book_id = ?", id); err != nil {
+				return removidos, fmt.Errorf("limpar %s do livro %d: %w", tabela, id, err)
+			}
+		}
+		if _, err := tx.Exec("DELETE FROM books WHERE id = ?", id); err != nil {
+			return removidos, fmt.Errorf("remover livro %d: %w", id, err)
+		}
+		removidos++
+	}
+	if err := tx.Commit(); err != nil {
+		return removidos, fmt.Errorf("confirmar poda: %w", err)
+	}
+	return removidos, nil
 }
 
 func (s *SQLiteStore) CountUsers() (int, error) {

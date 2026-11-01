@@ -45,6 +45,6 @@ func (h *SyncHandler) Post(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	flash.Set(w, "notice", fmt.Sprintf("Estante sincronizada: %d livros (%d novos).", report.New+report.Updated, report.New), h.cfg.CookieSecure())
+	flash.Set(w, "notice", fmt.Sprintf("Estante sincronizada: %d livros (%d novos, %d removidos).", report.New+report.Updated, report.New, report.Removed), h.cfg.CookieSecure())
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

@@ -28,9 +28,19 @@ func newMemoryBooks() *memoryBooks {
 	return &memoryBooks{byKey: map[string]models.Book{}}
 }
 
-func (m *memoryBooks) UpsertBook(book models.Book) (bool, error) {
+func (m *memoryBooks) UpsertBook(book models.Book, vivas map[string]bool) (bool, error) {
 	existente, ok := m.byKey[book.RemoteKey]
 	if !ok {
+		if book.SHA1 != "" && len(vivas) > 0 {
+			for chave, antigo := range m.byKey {
+				if antigo.SHA1 == book.SHA1 && !vivas[chave] {
+					delete(m.byKey, chave)
+					book.ID = antigo.ID
+					m.byKey[book.RemoteKey] = book
+					return false, nil
+				}
+			}
+		}
 		m.nextID++
 		book.ID = m.nextID
 		m.byKey[book.RemoteKey] = book
@@ -39,6 +49,17 @@ func (m *memoryBooks) UpsertBook(book models.Book) (bool, error) {
 	book.ID = existente.ID
 	m.byKey[book.RemoteKey] = book
 	return false, nil
+}
+
+func (m *memoryBooks) PruneBooks(vivas map[string]bool) (int, error) {
+	removidos := 0
+	for chave := range m.byKey {
+		if !vivas[chave] {
+			delete(m.byKey, chave)
+			removidos++
+		}
+	}
+	return removidos, nil
 }
 
 func (m *memoryBooks) CountBooks() (int, error) { return len(m.byKey), nil }
@@ -64,6 +85,70 @@ func TestSync_AddsNewBooks(t *testing.T) {
 	salvo := store.byKey["Ciencia e Natureza/Autora Um/Livro Um/Livro Um.epub"]
 	if salvo.Title != "Livro Um" || salvo.Author != "Autora Um" || salvo.Format != "epub" || salvo.SHA1 != "aaa" {
 		t.Errorf("livro salvo = %+v", salvo)
+	}
+}
+
+func TestSync_RenomeacaoConservaOLivroPeloSHA1(t *testing.T) {
+	store := newMemoryBooks()
+	remoto := &fakeLister{files: []RemoteFile{
+		{Key: "Ciencia e Natureza/Autora Um/Livro Um/Livro Um.epub", Size: 10, SHA1: "sha-igual"},
+	}}
+	servico := NewService(remoto, store)
+	if _, err := servico.Sync(context.Background()); err != nil {
+		t.Fatalf("Sync erro = %v", err)
+	}
+	original := store.byKey["Ciencia e Natureza/Autora Um/Livro Um/Livro Um.epub"]
+
+	// O acervo foi padronizado: mesma obra, chave nova e o mesmo SHA-1.
+	remoto.files = []RemoteFile{
+		{Key: "Ciencia e Natureza/Autora Um/Livro Um - Edicao Nova/Livro Um - Edicao Nova.epub", Size: 10, SHA1: "sha-igual"},
+	}
+	report, err := servico.Sync(context.Background())
+	if err != nil {
+		t.Fatalf("Sync após renomear erro = %v", err)
+	}
+	if len(store.byKey) != 1 {
+		t.Fatalf("store tem %d livros, want 1 (renomeação não pode duplicar)", len(store.byKey))
+	}
+	if report.New != 0 || report.Removed != 0 {
+		t.Errorf("report = %+v, want New 0 / Removed 0", report)
+	}
+	novo, ok := store.byKey["Ciencia e Natureza/Autora Um/Livro Um - Edicao Nova/Livro Um - Edicao Nova.epub"]
+	if !ok {
+		t.Fatalf("livro não está na chave nova: %v", store.byKey)
+	}
+	if novo.ID != original.ID {
+		t.Errorf("id mudou na renomeação: %d -> %d (progresso/favoritos seriam perdidos)", original.ID, novo.ID)
+	}
+}
+
+func TestSync_PodaLivroQueSaiuDoBalde(t *testing.T) {
+	store := newMemoryBooks()
+	remoto := &fakeLister{files: []RemoteFile{
+		{Key: "Cat/A/Fica.pdf", Size: 1, SHA1: "fica"},
+		{Key: "Cat/A/Sai.pdf", Size: 1, SHA1: "sai"},
+	}}
+	servico := NewService(remoto, store)
+	if _, err := servico.Sync(context.Background()); err != nil {
+		t.Fatalf("Sync erro = %v", err)
+	}
+	if len(store.byKey) != 2 {
+		t.Fatalf("store tem %d livros, want 2", len(store.byKey))
+	}
+
+	remoto.files = []RemoteFile{{Key: "Cat/A/Fica.pdf", Size: 1, SHA1: "fica"}}
+	report, err := servico.Sync(context.Background())
+	if err != nil {
+		t.Fatalf("Sync após remoção erro = %v", err)
+	}
+	if report.Removed != 1 {
+		t.Errorf("report.Removed = %d, want 1", report.Removed)
+	}
+	if _, ok := store.byKey["Cat/A/Sai.pdf"]; ok {
+		t.Errorf("livro removido do balde continua na estante")
+	}
+	if _, ok := store.byKey["Cat/A/Fica.pdf"]; !ok {
+		t.Errorf("livro que continua no balde sumiu da estante")
 	}
 }
 

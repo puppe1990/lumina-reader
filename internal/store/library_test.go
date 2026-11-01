@@ -12,7 +12,7 @@ func seedBook(t *testing.T, s *SQLiteStore, key, titulo, autor, category, format
 	created, err := s.UpsertBook(models.Book{
 		RemoteKey: key, Title: titulo, Author: autor, Category: category,
 		Format: format, SizeBytes: 100, SHA1: "sha-" + titulo,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("UpsertBook(%s): %v", key, err)
 	}
@@ -30,13 +30,13 @@ func TestStore_UpsertBook_CreatesThenUpdates(t *testing.T) {
 	s := newTestStore(t)
 
 	book := models.Book{RemoteKey: "Cat/A/Livro.pdf", Title: "Livro", Author: "A", Category: "Cat", Format: "pdf", SizeBytes: 10, SHA1: "s1"}
-	created, err := s.UpsertBook(book)
+	created, err := s.UpsertBook(book, nil)
 	if err != nil || !created {
 		t.Fatalf("primeiro UpsertBook: created=%v err=%v", created, err)
 	}
 	book.SHA1 = "s2"
 	book.SizeBytes = 20
-	created, err = s.UpsertBook(book)
+	created, err = s.UpsertBook(book, nil)
 	if err != nil || created {
 		t.Fatalf("segundo UpsertBook: created=%v err=%v (want update)", created, err)
 	}
@@ -350,7 +350,7 @@ func TestStore_FavoritesToggleAndFilter(t *testing.T) {
 	if _, err := s.ToggleFavorite(um); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.UpsertBook(models.Book{RemoteKey: "Cat/A/Um.epub", Title: "Um", Category: "Cat", Format: "epub", SHA1: "novo"}); err != nil {
+	if _, err := s.UpsertBook(models.Book{RemoteKey: "Cat/A/Um.epub", Title: "Um", Category: "Cat", Format: "epub", SHA1: "novo"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if ok, _ := s.IsFavorite(um); !ok {
@@ -384,5 +384,105 @@ func TestStore_CoverLifecycle(t *testing.T) {
 	capa, encontrada, err = s.CoverFor(id)
 	if err != nil || !encontrada || !capa.Missing || len(capa.Image) != 0 {
 		t.Errorf("capa missing = %+v encontrada=%v err=%v", capa, encontrada, err)
+	}
+}
+
+func TestStore_UpsertBook_RechaveiaPeloSHA1QuandoAChaveAntigaSaiu(t *testing.T) {
+	s := newTestStore(t)
+	antigo := models.Book{RemoteKey: "Cat/A/Livro/Livro.pdf", Title: "Livro", Category: "Cat", Format: "pdf", SizeBytes: 10, SHA1: "sha-conteudo"}
+	if created, err := s.UpsertBook(antigo, nil); err != nil || !created {
+		t.Fatalf("insert inicial: created=%v err=%v", created, err)
+	}
+	livro, err := s.FindBookByKey(antigo.RemoteKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SaveProgressPages(livro.ID, 7, 200); err != nil {
+		t.Fatal(err)
+	}
+
+	novo := models.Book{RemoteKey: "Cat/B/Livro Padronizado/Livro Padronizado.pdf", Title: "Livro Padronizado", Category: "Cat", Format: "pdf", SizeBytes: 10, SHA1: "sha-conteudo"}
+	created, err := s.UpsertBook(novo, map[string]bool{novo.RemoteKey: true})
+	if err != nil {
+		t.Fatalf("UpsertBook renomeado: %v", err)
+	}
+	if created {
+		t.Errorf("renomeação não pode criar livro novo (id mudaria e o progresso se perderia)")
+	}
+	if _, err := s.FindBookByKey(antigo.RemoteKey); err == nil {
+		t.Errorf("chave antiga ainda existe na estante")
+	}
+	migrado, err := s.FindBookByKey(novo.RemoteKey)
+	if err != nil {
+		t.Fatalf("chave nova não está na estante: %v", err)
+	}
+	if migrado.ID != livro.ID {
+		t.Errorf("id mudou na renomeação: %d -> %d", livro.ID, migrado.ID)
+	}
+	progresso, ok, err := s.ProgressFor(migrado.ID)
+	if err != nil || !ok || progresso.ChapterOrdinal != 6 {
+		t.Errorf("progresso perdido na renomeação: %+v ok=%v err=%v", progresso, ok, err)
+	}
+}
+
+func TestStore_UpsertBook_NaoRechaveiaSeAChaveAntigaAindaVive(t *testing.T) {
+	s := newTestStore(t)
+	um := models.Book{RemoteKey: "Cat/A/Um.pdf", Title: "Um", Category: "Cat", Format: "pdf", SHA1: "sha-repetido"}
+	if _, err := s.UpsertBook(um, nil); err != nil {
+		t.Fatal(err)
+	}
+	dois := models.Book{RemoteKey: "Cat/A/Dois.pdf", Title: "Dois", Category: "Cat", Format: "pdf", SHA1: "sha-repetido"}
+	created, err := s.UpsertBook(dois, map[string]bool{um.RemoteKey: true, dois.RemoteKey: true})
+	if err != nil {
+		t.Fatalf("UpsertBook: %v", err)
+	}
+	if !created {
+		t.Errorf("cópias distintas com o mesmo sha1 devem virar livros separados")
+	}
+	if livros, err := s.ListBooks(BookFilter{}); err != nil || len(livros) != 2 {
+		t.Errorf("ListBooks = %d err=%v, want 2", len(livros), err)
+	}
+}
+
+func TestStore_PruneBooks_RemoveOrfaosComRastros(t *testing.T) {
+	s := newTestStore(t)
+	fika := seedBook(t, s, "Cat/A/Fica.pdf", "Fica", "Autora", "Cat", "pdf")
+	sai := seedBook(t, s, "Cat/A/Sai.pdf", "Sai", "Autor", "Cat", "pdf")
+
+	if _, err := s.SaveProgressPages(sai, 3, 100); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ToggleFavorite(sai); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveCover(models.Cover{BookID: sai, ContentType: "image/png", Image: []byte("png")}); err != nil {
+		t.Fatal(err)
+	}
+
+	removidos, err := s.PruneBooks(map[string]bool{"Cat/A/Fica.pdf": true})
+	if err != nil {
+		t.Fatalf("PruneBooks: %v", err)
+	}
+	if removidos != 1 {
+		t.Errorf("removidos = %d, want 1", removidos)
+	}
+	if _, err := s.GetBook(sai); err == nil {
+		t.Errorf("livro podado ainda existe")
+	}
+	if _, err := s.GetBook(fika); err != nil {
+		t.Errorf("livro vivo foi removido: %v", err)
+	}
+	if _, ok, _ := s.ProgressFor(sai); ok {
+		t.Errorf("progresso do livro podado ficou para trás")
+	}
+	if _, encontrada, _ := s.CoverFor(sai); encontrada {
+		t.Errorf("capa do livro podado ficou para trás")
+	}
+	var favoritos int
+	if err := s.db.Raw().QueryRow("SELECT COUNT(*) FROM book_favorites WHERE book_id = ?", sai).Scan(&favoritos); err != nil {
+		t.Fatal(err)
+	}
+	if favoritos != 0 {
+		t.Errorf("favorito do livro podado ficou para trás")
 	}
 }

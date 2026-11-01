@@ -28,7 +28,8 @@ type Store interface {
 	ResetPasswordWithToken(token, passwordHash string) error
 	CountUsers() (int, error)
 
-	UpsertBook(book models.Book) (bool, error)
+	UpsertBook(book models.Book, vivas map[string]bool) (bool, error)
+	PruneBooks(vivas map[string]bool) (int, error)
 	FindBookByKey(remoteKey string) (models.Book, error)
 	GetBook(id int64) (models.Book, error)
 	ListBooks(filter BookFilter) ([]models.BookListItem, error)
