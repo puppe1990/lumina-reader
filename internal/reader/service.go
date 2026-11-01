@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/image/draw"
 	"golang.org/x/image/webp"
@@ -46,10 +47,24 @@ type Service struct {
 	// mu serializa a extração: duas abas abrindo o mesmo livro recém-sincronizado
 	// não devem baixar/parsear duas vezes.
 	mu sync.Mutex
+	// semaforoCapa limita as extrações de capa simultâneas: cada uma baixa o
+	// arquivo inteiro do B2, e uma grade aberta com dezenas de capas já derrubou
+	// o processo (memória + shutdown lento).
+	semaforoCapa chan struct{}
 }
 
+const (
+	extracoesCapaSimultaneas = 2
+	capaTimeoutExtrair       = 25 * time.Second
+)
+
 func New(remote Remote, store ChapterStore, cacheDir string) *Service {
-	return &Service{remote: remote, store: store, cacheDir: cacheDir}
+	return &Service{
+		remote:       remote,
+		store:        store,
+		cacheDir:     cacheDir,
+		semaforoCapa: make(chan struct{}, extracoesCapaSimultaneas),
+	}
 }
 
 // EnsureFile devolve o caminho local do livro, baixando para o cache na primeira
@@ -233,7 +248,25 @@ func (s *Service) Cover(ctx context.Context, book models.Book) ([]byte, string, 
 		return capa.Image, capa.ContentType, nil
 	}
 
-	imagem, tipo, err := s.extrairCapa(ctx, book)
+	// Espera a vez na extração (ou desiste se o cliente foi embora).
+	select {
+	case s.semaforoCapa <- struct{}{}:
+		defer func() { <-s.semaforoCapa }()
+	case <-ctx.Done():
+		return nil, "", ctx.Err()
+	}
+	// Outra request pode ter extraído enquanto esperava.
+	if capa, encontrada, err := s.store.CoverFor(book.ID); err == nil && encontrada {
+		if capa.Missing {
+			return nil, "", ErrNoCover
+		}
+		return capa.Image, capa.ContentType, nil
+	}
+
+	ctxExtracao, cancelar := context.WithTimeout(ctx, capaTimeoutExtrair)
+	defer cancelar()
+
+	imagem, tipo, err := s.extrairCapa(ctxExtracao, book)
 	if errors.Is(err, errCapaFerramentaAusente) {
 		return nil, "", ErrNoCover
 	}

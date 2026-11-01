@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -160,7 +161,10 @@ func (h *BookHandler) Cover(w http.ResponseWriter, r *http.Request, id int64) {
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// Falha transitória (rede/B2/shutdown): a UI cai na capa tipográfica e
+		// a próxima visita tenta de novo — nada é persistido como "sem capa".
+		log.Printf("capa do livro %d: %v", id, err)
+		http.NotFound(w, r)
 		return
 	}
 	w.Header().Set("Content-Type", tipo)
