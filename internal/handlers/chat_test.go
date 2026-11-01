@@ -192,7 +192,7 @@ func TestChat_HistoricoInvalidoNaoQuebra(t *testing.T) {
 	conversador := &fakeConversador{resposta: "ok"}
 	h := newChatHandler(t, s, conversador)
 
-	rr := pedirChat(h, id, `{"pergunta":"oi","historico":"não é json"}`)
+	rr := pedirChat(h, id, `{"pergunta":"oi","contexto":"trecho","historico":"não é json"}`)
 	if rr.Code != http.StatusAccepted {
 		t.Fatalf("status = %d, body %s", rr.Code, rr.Body.String())
 	}
@@ -257,5 +257,23 @@ func TestChat_SemTextoDoLivroUsaSoOTrechoAtual(t *testing.T) {
 	corpo := conversador.recebidas[len(conversador.recebidas)-1].Texto
 	if !strings.Contains(corpo, "só este trecho") || strings.Contains(corpo, "Sumário do livro") {
 		t.Errorf("fallback errado:\n%s", corpo)
+	}
+}
+
+func TestChat_LivroSemTextoAvisaQueNaoDaParaLer(t *testing.T) {
+	s := setupTestStore(t)
+	id := seedLivro(t, s, "Cat/A/Digitalizado.pdf", "Digitalizado", "", "Cat", "pdf")
+	conversador := &fakeConversador{resposta: "não deveria ser chamado"}
+	h := NewChatHandler(s, cais.Config{Env: "test"}, conversador, &fakeTextos{erro: reader.ErrSemTexto})
+
+	rr := pedirChat(h, id, `{"pergunta":"do que fala o livro?","contexto":""}`)
+	if rr.Code != http.StatusFailedDependency {
+		t.Fatalf("status = %d, want 424", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "digitalizado") {
+		t.Errorf("mensagem deveria explicar o PDF digitalizado: %s", rr.Body.String())
+	}
+	if len(conversador.recebidas) != 0 {
+		t.Errorf("o provedor não deveria ser chamado sem texto: %+v", conversador.recebidas)
 	}
 }

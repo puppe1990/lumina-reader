@@ -70,13 +70,24 @@ func (h *ChatHandler) Post(w http.ResponseWriter, r *http.Request, bookID int64)
 	}
 
 	sumario, trechos := h.recortarLivro(r.Context(), livro, pergunta)
+	contexto := strings.TrimSpace(r.FormValue("contexto"))
+	if len(sumario) == 0 && len(trechos) == 0 && contexto == "" {
+		// PDF digitalizado (páginas como imagem): não há texto no servidor nem
+		// na página que o leitor está vendo. Dizer isso é melhor que deixar o
+		// modelo responder que "não achou os trechos".
+		respondJSON(w, http.StatusFailedDependency, map[string]any{
+			"ok":   false,
+			"erro": "Este livro não tem texto que eu consiga ler (PDF digitalizado, com as páginas como imagem). O chat funciona em livros com texto.",
+		})
+		return
+	}
 	mensagens, err := chat.MontarMensagens(chat.Pedido{
 		Livro:     livro.Title,
 		Autor:     livro.Author,
 		Posicao:   r.FormValue("posicao"),
 		Sumario:   sumario,
 		Trechos:   trechos,
-		Contexto:  r.FormValue("contexto"),
+		Contexto:  contexto,
 		Pergunta:  pergunta,
 		Historico: lerHistorico(r.FormValue("historico")),
 	})
