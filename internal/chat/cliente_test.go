@@ -91,6 +91,44 @@ func TestCliente_Responder_ConteudoVazio(t *testing.T) {
 	}
 }
 
+func TestCliente_Responder_TentaDeNovoDepoisDeErro5xx(t *testing.T) {
+	chamadas := 0
+	servidor := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		chamadas++
+		if chamadas == 1 {
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"detail":"instável"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"stop","message":{"content":"deu certo"}}]}`))
+	}))
+	defer servidor.Close()
+
+	resposta, err := NovoCliente(servidor.URL, "k", "m").Responder(context.Background(), []Mensagem{{Papel: "user", Texto: "oi"}})
+	if err != nil {
+		t.Fatalf("Responder com retry erro = %v", err)
+	}
+	if resposta != "deu certo" || chamadas != 2 {
+		t.Errorf("resposta = %q, chamadas = %d", resposta, chamadas)
+	}
+}
+
+func TestCliente_Responder_NaoTentaDeNovoEmErro4xx(t *testing.T) {
+	chamadas := 0
+	servidor := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		chamadas++
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer servidor.Close()
+
+	if _, err := NovoCliente(servidor.URL, "k", "m").Responder(context.Background(), nil); err == nil {
+		t.Fatal("esperava erro")
+	}
+	if chamadas != 1 {
+		t.Errorf("chamadas = %d, want 1 (4xx não repete)", chamadas)
+	}
+}
+
 func TestCliente_Responder_SemChaveNemChamaAAPI(t *testing.T) {
 	chamou := false
 	servidor := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { chamou = true }))

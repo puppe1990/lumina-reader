@@ -68,11 +68,28 @@ type respostaChat struct {
 }
 
 // Responder manda a conversa e devolve só o texto da resposta (o
-// reasoning_content dos modelos de raciocínio fica de fora).
+// reasoning_content dos modelos de raciocínio fica de fora). Uma falha 5xx ou
+// de rede é tentada de novo uma vez — a fila gratuita do NIM oscila.
 func (c *Cliente) Responder(ctx context.Context, mensagens []Mensagem) (string, error) {
 	if c.chave == "" {
 		return "", errors.New("chave do provedor não configurada")
 	}
+	resposta, err := c.chamar(ctx, mensagens)
+	var provedor *ErroProvedor
+	if err != nil && ctx.Err() == nil && provedorTransitorio(err, &provedor) {
+		return c.chamar(ctx, mensagens)
+	}
+	return resposta, err
+}
+
+func provedorTransitorio(err error, provedor **ErroProvedor) bool {
+	if errors.As(err, provedor) {
+		return (*provedor).Status >= 500
+	}
+	return true
+}
+
+func (c *Cliente) chamar(ctx context.Context, mensagens []Mensagem) (string, error) {
 	corpo := requisicaoChat{Model: c.modelo, Temperature: 0.3, MaxTokens: 2000}
 	for _, m := range mensagens {
 		corpo.Messages = append(corpo.Messages, mensagem{Role: m.Papel, Content: m.Texto})

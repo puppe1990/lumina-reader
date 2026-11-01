@@ -68,8 +68,8 @@ func TestChat_SemProvedorConfigurado(t *testing.T) {
 	s := setupTestStore(t)
 	id := seedLivro(t, s, "Cat/A/Livro.pdf", "Livro", "", "Cat", "pdf")
 	rr := pedirChat(newChatHandler(t, s, nil), id, `{"pergunta":"oi"}`)
-	if rr.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want 503", rr.Code)
+	if rr.Code != http.StatusFailedDependency {
+		t.Fatalf("status = %d, want 424", rr.Code)
 	}
 	if !strings.Contains(rr.Body.String(), "LUMINA_CHAT_API_KEY") {
 		t.Errorf("mensagem deveria explicar a configuração: %s", rr.Body.String())
@@ -99,10 +99,10 @@ func TestChat_ErroDoProvedorViraMensagemAmigavel(t *testing.T) {
 		status int
 		trecho string
 	}{
-		{&chat.ErroProvedor{Status: 401}, http.StatusBadGateway, "recusou a chave"},
-		{&chat.ErroProvedor{Status: 429}, http.StatusServiceUnavailable, "limitando"},
-		{context.DeadlineExceeded, http.StatusGatewayTimeout, "demorou"},
-		{errors.New("rede fora"), http.StatusBadGateway, "Não consegui falar"},
+		{&chat.ErroProvedor{Status: 401}, http.StatusFailedDependency, "recusou a chave"},
+		{&chat.ErroProvedor{Status: 429}, http.StatusFailedDependency, "limitando"},
+		{context.DeadlineExceeded, http.StatusFailedDependency, "demorou"},
+		{errors.New("rede fora"), http.StatusFailedDependency, "Não consegui falar"},
 	}
 	for _, caso := range casos {
 		s := setupTestStore(t)

@@ -44,7 +44,7 @@ func (h *ChatHandler) Post(w http.ResponseWriter, r *http.Request, bookID int64)
 		return
 	}
 	if h.respondedor == nil {
-		respondJSON(w, http.StatusServiceUnavailable, map[string]any{
+		respondJSON(w, http.StatusFailedDependency, map[string]any{
 			"ok":   false,
 			"erro": "O chat ainda não está configurado no servidor (falta LUMINA_CHAT_API_KEY).",
 		})
@@ -81,23 +81,25 @@ func (h *ChatHandler) Post(w http.ResponseWriter, r *http.Request, bookID int64)
 }
 
 // erroChatAmigavel traduz a falha do provedor sem vazar chave nem stack.
+// Tudo sai como 424 (4xx): o proxy na frente do app troca respostas 5xx por
+// página de erro e o navegador perderia a mensagem em JSON.
 func erroChatAmigavel(err error) (int, string) {
 	var provedor *chat.ErroProvedor
 	if errors.As(err, &provedor) {
 		switch provedor.Status {
 		case http.StatusUnauthorized, http.StatusForbidden:
-			return http.StatusBadGateway, "O provedor recusou a chave configurada no servidor."
+			return http.StatusFailedDependency, "O provedor recusou a chave configurada no servidor."
 		case http.StatusNotFound:
-			return http.StatusBadGateway, "O modelo configurado não está disponível para esta conta."
+			return http.StatusFailedDependency, "O modelo configurado não está disponível para esta conta."
 		case http.StatusTooManyRequests:
-			return http.StatusServiceUnavailable, "O provedor está limitando as requisições; tente de novo em instantes."
+			return http.StatusFailedDependency, "O provedor está limitando as requisições; tente de novo em instantes."
 		}
-		return http.StatusBadGateway, "O provedor respondeu com erro " + strconv.Itoa(provedor.Status) + "."
+		return http.StatusFailedDependency, "O provedor respondeu com erro " + strconv.Itoa(provedor.Status) + "."
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		return http.StatusGatewayTimeout, "O provedor demorou demais para responder; tente de novo."
+		return http.StatusFailedDependency, "O provedor demorou demais para responder; tente de novo."
 	}
-	return http.StatusBadGateway, "Não consegui falar com o provedor agora: " + err.Error()
+	return http.StatusFailedDependency, "Não consegui falar com o provedor agora: " + err.Error()
 }
 
 // lerHistorico aceita o JSON do navegador e ignora o que não fizer sentido.
