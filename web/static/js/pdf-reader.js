@@ -1,5 +1,6 @@
-/* Leitor de PDF do Lumina (pdf.js): páginas em scroll contínuo, tema por
-   canvas, progresso por página, marcador e busca no texto do PDF. */
+/* Leitor de PDF do Lumina (pdf.js): uma página por tela na horizontal (swipe
+   com snap, toque nas bordas e setas), tema por canvas, progresso por página,
+   marcador e busca no texto do PDF. */
 (function () {
   "use strict";
 
@@ -55,7 +56,7 @@
     })(botoesTema[t]);
   }
 
-  var container = document.getElementById("pdf-paginas");
+  var trilho = document.getElementById("pdf-paginas");
   var carregando = document.getElementById("pdf-carregando");
   var rotuloPagina = document.getElementById("pdf-pagina");
   var posicao = document.getElementById("pdf-posicao");
@@ -77,40 +78,32 @@
     .promise.then(function (pdf) {
       pdfDoc = pdf;
       carregando.classList.add("hidden");
-      // Proporção fixa (da página 1) nos placeholders: se cada render mudasse a
-      // altura do div, o scroll "andaria" sozinho e renderizaria o livro todo
-      // em cascata. Páginas de tamanho diferente ficam em letterbox.
-      return pdf.getPage(1).then(function (primeira) {
-        var base = primeira.getViewport({ scale: 1 });
-        var proporcao = base.width + " / " + base.height;
-        for (var n = 1; n <= pdf.numPages; n++) {
-          var div = document.createElement("div");
-          div.className = "pdf-pagina relative w-full overflow-hidden rounded bg-white shadow-md";
-          div.setAttribute("data-pagina", String(n));
-          div.style.aspectRatio = proporcao;
-          var canvas = document.createElement("canvas");
-          canvas.className = "block h-full w-full object-contain";
-          div.appendChild(canvas);
-          container.appendChild(div);
-          paginas.push({ numero: n, div: div, canvas: canvas, renderizada: false, renderizando: false });
-        }
-        atualizarRotulos();
-        if (paginaInicial > 1) {
-          setTimeout(function () {
-            irParaPagina(paginaInicial, false);
-            manterJanela(paginaInicial);
-          }, 60);
-        }
-        manterJanela(paginaInicial);
-      });
+      for (var n = 1; n <= pdf.numPages; n++) {
+        var slide = document.createElement("div");
+        slide.className = "pdf-pagina flex h-full w-full shrink-0 snap-center items-center justify-center";
+        slide.setAttribute("data-pagina", String(n));
+        var canvas = document.createElement("canvas");
+        canvas.className = "pdf-folha max-h-full max-w-full rounded bg-white shadow-md";
+        slide.appendChild(canvas);
+        trilho.appendChild(slide);
+        paginas.push({ numero: n, div: slide, canvas: canvas, renderizada: false, renderizando: false });
+      }
+      atualizarRotulos();
+      setTimeout(function () {
+        irParaPagina(paginaInicial, false);
+      }, 60);
+      manterJanela(paginaInicial);
     })
     .catch(function (erro) {
       carregando.innerHTML = "";
       var aviso = document.createElement("p");
+      aviso.className = "px-6 py-10 text-center";
       aviso.textContent = "Não consegui abrir este PDF: " + (erro && erro.message ? erro.message : "erro desconhecido");
       carregando.appendChild(aviso);
     });
 
+  // A página é encaixada na tela (fit page): o texto fica legível sem zoom e a
+  // virada mostra a página inteira, como num e-reader.
   function renderizarPagina(numero) {
     var pagina = paginas[numero - 1];
     if (!pagina || pagina.renderizada || pagina.renderizando || !pdfDoc) return;
@@ -119,11 +112,16 @@
       .getPage(numero)
       .then(function (pg) {
         var base = pg.getViewport({ scale: 1 });
-        var largura = Math.min(container.clientWidth, 900);
         var dpr = Math.min(window.devicePixelRatio || 1, 2);
-        var viewport = pg.getViewport({ scale: (largura / base.width) * dpr });
+        var larguraTela = Math.max(240, trilho.clientWidth - 28);
+        var alturaTela = Math.max(240, trilho.clientHeight - 28);
+        var escala = Math.min(larguraTela / base.width, alturaTela / base.height);
+        var viewport = pg.getViewport({ scale: escala * dpr });
         pagina.canvas.width = Math.floor(viewport.width);
         pagina.canvas.height = Math.floor(viewport.height);
+        // Tamanho CSS em px lógicos para o canvas caber exato na tela.
+        pagina.canvas.style.width = Math.floor(viewport.width / dpr) + "px";
+        pagina.canvas.style.height = Math.floor(viewport.height / dpr) + "px";
         return pg.render({ canvasContext: pagina.canvas.getContext("2d"), viewport: viewport }).promise;
       })
       .then(function () {
@@ -135,13 +133,26 @@
   }
 
   function irParaPagina(numero, suave) {
-    var pagina = paginas[numero - 1];
-    if (!pagina) return;
-    pagina.div.scrollIntoView({ block: "start", behavior: suave === false ? "auto" : "smooth" });
+    numero = Math.max(1, Math.min(paginas.length || 1, numero));
+    var alvo = paginas[numero - 1];
+    if (!alvo) return;
+    trilho.scrollTo({ left: alvo.offsetLeft, behavior: suave === false ? "auto" : "smooth" });
+    if (numero !== paginaAtual) {
+      paginaAtual = numero;
+      atualizarRotulos();
+      manterJanela(numero);
+      agendarSalvamento();
+    }
   }
 
-  // Janela de renderização: só as páginas perto da atual mantêm pixels
-  // (PDFs grandes: 225 páginas renderizadas de uma vez estouram a memória).
+  function proximaPagina() {
+    irParaPagina(paginaAtual + 1, true);
+  }
+  function paginaAnterior() {
+    irParaPagina(paginaAtual - 1, true);
+  }
+
+  // Janela de renderização: só as páginas perto da atual mantêm pixels.
   var JANELA_RENDER = 2;
   var JANELA_DESCARTE = 4;
   function manterJanela(atual) {
@@ -168,19 +179,10 @@
     if (barra) barra.style.width = percent + "%";
   }
 
-  function paginaMaisVisivel() {
-    var melhor = paginaAtual;
-    var area = 0;
-    var alturaTela = window.innerHeight;
-    for (var i = 0; i < paginas.length; i++) {
-      var rect = paginas[i].div.getBoundingClientRect();
-      var visivel = Math.min(rect.bottom, alturaTela) - Math.max(rect.top, 0);
-      if (visivel > area) {
-        area = visivel;
-        melhor = paginas[i].numero;
-      }
-    }
-    return melhor;
+  function paginaDoScroll() {
+    if (!trilho.clientWidth) return paginaAtual;
+    var indice = Math.round(trilho.scrollLeft / trilho.clientWidth) + 1;
+    return Math.max(1, Math.min(paginas.length || 1, indice));
   }
 
   var salvarPendente = null;
@@ -197,11 +199,11 @@
     salvarPendente = setTimeout(salvarProgresso, 1200);
   }
 
-  window.addEventListener(
+  trilho.addEventListener(
     "scroll",
     function () {
       if (!pdfDoc) return;
-      var atual = paginaMaisVisivel();
+      var atual = paginaDoScroll();
       if (atual === paginaAtual) return;
       paginaAtual = atual;
       atualizarRotulos();
@@ -210,6 +212,47 @@
     },
     { passive: true }
   );
+
+  // Toque/clique nas bordas vira página (padrão de e-reader); o centro não age.
+  trilho.addEventListener("click", function (ev) {
+    if (ev.target.closest("button") || ev.target.closest("a")) return;
+    var rect = trilho.getBoundingClientRect();
+    var x = ev.clientX - rect.left;
+    if (x < rect.width * 0.28) paginaAnterior();
+    else if (x > rect.width * 0.72) proximaPagina();
+  });
+
+  window.addEventListener("keydown", function (ev) {
+    if (ev.key === "ArrowRight" || ev.key === "PageDown") proximaPagina();
+    if (ev.key === "ArrowLeft" || ev.key === "PageUp") paginaAnterior();
+  });
+
+  var botoesVirada = document.querySelectorAll("[data-virada]");
+  for (var b = 0; b < botoesVirada.length; b++) {
+    (function (botao) {
+      botao.addEventListener("click", function () {
+        if (botao.getAttribute("data-virada") === "proxima") proximaPagina();
+        else paginaAnterior();
+      });
+    })(botoesVirada[b]);
+  }
+
+  // Resize muda o encaixe da página: descarta os pixels e re-renderiza a janela.
+  var timerResize = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(timerResize);
+    timerResize = setTimeout(function () {
+      for (var i = 0; i < paginas.length; i++) {
+        paginas[i].canvas.width = 0;
+        paginas[i].canvas.height = 0;
+        paginas[i].renderizada = false;
+        paginas[i].renderizando = false;
+      }
+      manterJanela(paginaAtual);
+      irParaPagina(paginaAtual, false);
+    }, 250);
+  });
+
   window.addEventListener("pagehide", function () {
     if (!pdfDoc) return;
     try {
@@ -297,9 +340,7 @@
 
       function varrer() {
         if (pagina > pdfDoc.numPages || achados >= 40) {
-          statusBusca.textContent = achados
-            ? achados + " trecho(s) encontrados"
-            : "Nada encontrado (PDFs digitalizados não têm texto).";
+          statusBusca.textContent = achados ? achados + " trecho(s) encontrados" : "Nada encontrado (PDFs digitalizados não têm texto).";
           return;
         }
         if (pagina % 20 === 0) statusBusca.textContent = "Buscando… página " + pagina + " de " + pdfDoc.numPages;

@@ -73,12 +73,18 @@
     </div>
   </div>
 
-  <div class="leitor-canvas" data-canvas="sepia">
+  <div class="leitor-canvas relative" data-canvas="sepia">
     <div id="pdf-carregando" class="flex flex-col items-center gap-3 px-6 py-24 text-center text-sm text-secondary">
       <span class="material-symbols-outlined animate-spin text-[28px] text-primary">progress_activity</span>
       Carregando o PDF do acervo…
     </div>
-    <div id="pdf-paginas" class="mx-auto flex w-full max-w-3xl flex-col items-center gap-4 px-3 pb-32 pt-6"></div>
+    <div id="pdf-paginas" class="no-scrollbar flex h-[calc(100dvh-15rem)] w-full snap-x snap-mandatory items-center overflow-x-auto overflow-y-hidden scroll-smooth"></div>
+    <button type="button" data-virada="anterior" aria-label="Página anterior" class="absolute left-1.5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-surface/80 text-on-surface shadow-md backdrop-blur-sm transition-colors hover:text-primary">
+      <span class="material-symbols-outlined text-[22px]">chevron_left</span>
+    </button>
+    <button type="button" data-virada="proxima" aria-label="Próxima página" class="absolute right-1.5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-surface/80 text-on-surface shadow-md backdrop-blur-sm transition-colors hover:text-primary">
+      <span class="material-symbols-outlined text-[22px]">chevron_right</span>
+    </button>
   </div>
 
   <footer class="leitor-progresso mx-auto w-full max-w-2xl px-6 pb-4 pt-2 select-none">
