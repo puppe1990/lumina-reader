@@ -1,6 +1,6 @@
-/* Tradução da seleção: selecionou uma palavra/trecho no leitor (EPUB ou PDF),
-   aparece um botão "Traduzir" e o resultado num cartão flutuante. Usa o mesmo
-   provedor do chat (trabalho em background + polling). */
+/* Tradução da seleção no próprio navegador: o Translator embutido do Chrome
+   (modelo local, sem servidor e sem LLM) traduz a palavra/trecho selecionado.
+   Resultado fica em localStorage — repetir é instantâneo. */
 (function () {
   "use strict";
 
@@ -8,10 +8,27 @@
   var botao = null;
   var cartao = null;
   var origem = null;
+  var tradutor = null;
+  var tradutorIdioma = "";
+  var detector = null;
+  var CHAVE_CACHE = "lumina-traducao:";
 
-  function token() {
-    var meta = document.querySelector('meta[name="csrf-token"]');
-    return meta ? meta.getAttribute("content") : "";
+  function suportado() {
+    return typeof window.Translator !== "undefined";
+  }
+
+  function lerCache(texto) {
+    try {
+      return localStorage.getItem(CHAVE_CACHE + texto);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function gravarCache(texto, traducao) {
+    try {
+      localStorage.setItem(CHAVE_CACHE + texto, traducao);
+    } catch (e) {}
   }
 
   function esconderBotao() {
@@ -65,108 +82,156 @@
     el.hidden = false;
   }
 
-  function cartaoBase() {
+  function cartaoBase(ancora) {
     fecharCartao();
     var div = document.createElement("div");
     div.className =
       "fixed z-[70] w-[min(92vw,22rem)] rounded-2xl border border-outline-variant/50 bg-surface p-3 text-on-surface shadow-xl";
     document.body.appendChild(div);
     cartao = div;
+    if (ancora) posicionar(div, ancora);
     return div;
   }
 
-  function rodape(container) {
+  function linhaDeAcoes(container, traducao) {
     var linha = document.createElement("div");
     linha.className = "mt-2 flex items-center justify-between text-[11px] text-secondary";
     var copiar = document.createElement("button");
     copiar.type = "button";
     copiar.className = "rounded-full px-2 py-1 hover:bg-surface-container";
     copiar.textContent = "Copiar";
+    copiar.addEventListener("click", function () {
+      try {
+        navigator.clipboard.writeText(traducao);
+        copiar.textContent = "Copiado";
+      } catch (e) {}
+    });
     var fechar = document.createElement("button");
     fechar.type = "button";
     fechar.className = "rounded-full px-2 py-1 hover:bg-surface-container";
     fechar.textContent = "Fechar";
+    fechar.addEventListener("click", fecharCartao);
     linha.appendChild(copiar);
     linha.appendChild(fechar);
     container.appendChild(linha);
-    return { copiar: copiar, fechar: fechar };
+  }
+
+  function aviso(container, texto) {
+    var p = document.createElement("p");
+    p.className = "text-[12px] leading-5 text-on-surface";
+    p.textContent = texto;
+    container.appendChild(p);
+  }
+
+  // A API exige o par de idiomas; detectamos o idioma do trecho e caímos em
+  // inglês quando o detector não ajuda.
+  async function idiomaDoTexto(texto) {
+    try {
+      if (!detector && typeof window.LanguageDetector !== "undefined") {
+        detector = await window.LanguageDetector.create();
+      }
+      if (detector) {
+        var achados = await detector.detect(texto);
+        if (achados && achados[0] && achados[0].detectedLanguage) return achados[0].detectedLanguage;
+      }
+    } catch (e) {}
+    return "en";
+  }
+
+  async function disponibilidadeDoPar(idioma) {
+    try {
+      return await window.Translator.availability({ sourceLanguage: idioma, targetLanguage: "pt" });
+    } catch (e) {
+      return "unavailable";
+    }
+  }
+
+  async function obterTradutor(idioma, aoProgredir) {
+    if (tradutor && tradutorIdioma === idioma) return tradutor;
+    var monitor = function (m) {
+      m.addEventListener("downloadprogress", function (evento) {
+        if (aoProgredir) aoProgredir(Math.round((evento.loaded || 0) * 100));
+      });
+    };
+    try {
+      tradutor = await window.Translator.create({
+        sourceLanguage: idioma,
+        targetLanguage: "pt",
+        monitor: monitor,
+      });
+      tradutorIdioma = idioma;
+    } catch (erroCriacao) {
+      if (idioma === "en") throw erroCriacao;
+      tradutor = await window.Translator.create({ sourceLanguage: "en", targetLanguage: "pt", monitor: monitor });
+      tradutorIdioma = "en";
+    }
+    return tradutor;
   }
 
   async function traduzir(texto, rect) {
     if (!texto) return;
-    var div = cartaoBase();
+    var div = cartaoBase(rect);
     var fonte = document.createElement("p");
     fonte.className = "mb-2 max-h-16 overflow-hidden text-[11px] italic leading-4 text-secondary";
     fonte.textContent = texto.length > 220 ? texto.slice(0, 220) + "…" : texto;
-    var corpo = document.createElement("p");
-    corpo.className = "flex items-center gap-2 text-[13px] leading-5";
-    corpo.innerHTML =
-      '<span class="material-symbols-outlined animate-spin text-[16px] text-primary">progress_activity</span>traduzindo…';
     div.appendChild(fonte);
-    div.appendChild(corpo);
-    if (rect) posicionar(div, rect);
+
+    if (!suportado()) {
+      aviso(div, "Este navegador não tem o tradutor offline. Chrome, Edge ou Brave atualizados traduzem sem servidor.");
+      return;
+    }
+
+    var emCache = lerCache(texto);
+    if (emCache) {
+      aviso(div, emCache);
+      linhaDeAcoes(div, emCache);
+      return;
+    }
+
+    var status = document.createElement("p");
+    status.className = "flex items-center gap-2 text-[13px] leading-5";
+    var icone = document.createElement("span");
+    icone.className = "material-symbols-outlined animate-spin text-[16px] text-primary";
+    icone.textContent = "progress_activity";
+    status.appendChild(icone);
+    status.appendChild(document.createTextNode("traduzindo…"));
+    div.appendChild(status);
 
     try {
-      var resposta = await fetch("/traduzir", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": token() },
-        body: JSON.stringify({ texto: texto }),
-      });
-      var dados = await resposta.json().catch(function () {
-        return {};
-      });
-      if (dados.traducao) {
-        // resposta veio do cache do servidor
-        corpo.textContent = dados.traducao;
-        var acoesCache = rodape(div);
-        acoesCache.copiar.addEventListener("click", function () {
-          try {
-            navigator.clipboard.writeText(dados.traducao);
-            acoesCache.copiar.textContent = "Copiado";
-          } catch (e) {}
-        });
-        acoesCache.fechar.addEventListener("click", fecharCartao);
+      var idioma = await idiomaDoTexto(texto);
+      if (idioma && idioma.toLowerCase().startsWith("pt")) {
+        status.textContent = "O trecho já está em português.";
         return;
       }
-      if (!resposta.ok || !dados.id) {
-        corpo.textContent = dados.erro || "Não consegui traduzir agora.";
+      var disponibilidade = await disponibilidadeDoPar(idioma);
+      if (disponibilidade === "unavailable" && idioma !== "en") {
+        // detecção fraca (ex.: "und") ou idioma sem modelo: o acervo é
+        // majoritariamente inglês, então tentamos en → pt.
+        idioma = "en";
+        disponibilidade = await disponibilidadeDoPar(idioma);
+      }
+      if (disponibilidade === "unavailable") {
+        status.textContent = "O tradutor offline não tem o par " + idioma + " → português.";
         return;
       }
-      var inicio = Date.now();
-      var lentoAvisado = false;
-      while (Date.now() - inicio < 180000) {
-        await new Promise(function (ok) {
-          setTimeout(ok, 1200);
-        });
-        if (!lentoAvisado && Date.now() - inicio > 20000) {
-          lentoAvisado = true;
-          corpo.innerHTML =
-            '<span class="material-symbols-outlined animate-spin text-[16px] text-primary">progress_activity</span>o provedor está lento, aguarde…';
-        }
-        var consulta = await fetch("/traduzir/" + encodeURIComponent(dados.id));
-        var estado = await consulta.json().catch(function () {
-          return {};
-        });
-        if (estado.estado && estado.estado !== "rodando") {
-          if (estado.estado === "pronto" && estado.traducao) {
-            corpo.textContent = estado.traducao;
-            var acoes = rodape(div);
-            acoes.copiar.addEventListener("click", function () {
-              try {
-                navigator.clipboard.writeText(estado.traducao);
-                acoes.copiar.textContent = "Copiado";
-              } catch (e) {}
-            });
-            acoes.fechar.addEventListener("click", fecharCartao);
-          } else {
-            corpo.textContent = estado.erro || "Não consegui traduzir agora.";
-          }
-          return;
-        }
+      var rotulo = status.lastChild;
+      if (disponibilidade === "downloadable" || disponibilidade === "downloading") {
+        rotulo.textContent = "baixando o tradutor (uma vez só)…";
+        icone.remove();
       }
-      corpo.textContent = "A tradução demorou demais; tente de novo.";
+      var motor = await obterTradutor(idioma, function (porcento) {
+        if (porcento) rotulo.textContent = "baixando o tradutor (uma vez só): " + porcento + "%";
+      });
+      var traducao = (await motor.translate(texto)).trim();
+      status.remove();
+      var resultado = document.createElement("p");
+      resultado.className = "text-[13px] leading-5";
+      resultado.textContent = traducao;
+      div.appendChild(resultado);
+      linhaDeAcoes(div, traducao);
+      gravarCache(texto, traducao);
     } catch (erro) {
-      corpo.textContent = "Não consegui falar com o servidor.";
+      status.textContent = "Não consegui traduzir offline: " + (erro && erro.message ? erro.message : "erro");
     }
   }
 
@@ -208,9 +273,13 @@
         fecharCartao();
       }
     });
-    document.addEventListener("click", function (ev) {
-      if (cartao && !cartao.contains(ev.target) && ev.target !== botao) fecharCartao();
-    }, true);
+    document.addEventListener(
+      "click",
+      function (ev) {
+        if (cartao && !cartao.contains(ev.target) && ev.target !== botao) fecharCartao();
+      },
+      true
+    );
     window.addEventListener("scroll", esconderBotao, { passive: true });
   }
 })();

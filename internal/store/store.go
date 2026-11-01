@@ -59,9 +59,6 @@ type Store interface {
 	CoverFor(bookID int64) (models.Cover, bool, error)
 	SaveCover(cover models.Cover) error
 
-	TraducaoCacheada(fingerprint string) (string, bool, error)
-	GuardarTraducao(fingerprint, traducao string) error
-
 	ToggleFavorite(bookID int64) (bool, error)
 	IsFavorite(bookID int64) (bool, error)
 
