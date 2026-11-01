@@ -1,0 +1,31 @@
+{{ define "content" }}
+<div class="mx-auto w-full max-w-2xl px-5 py-8">
+  <div class="mb-6">
+    <p class="text-[10px] uppercase tracking-[0.2em] text-on-surface-variant">Conta</p>
+    <h1 class="mt-1 font-serif text-[28px] font-semibold leading-9 text-on-surface">Sua conta</h1>
+  </div>
+
+  <div class="rounded-2xl bg-surface-container-low p-5 shadow-sm">
+    <div class="flex items-center gap-3">
+      <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary" aria-hidden="true">
+        <span class="material-symbols-outlined text-[20px]">person</span>
+      </span>
+      <div class="min-w-0">
+        <p class="truncate text-[14px] font-medium text-on-surface">{{ .Email }}</p>
+        <p class="text-[11px] text-secondary">É o único login do acervo.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-5 rounded-2xl bg-surface-container-low p-6 shadow-sm">
+    <h2 class="mb-4 font-serif text-[17px] font-semibold text-on-surface">Trocar a senha</h2>
+    <.form action="/perfil/senha" method="post">
+      <.password name="atual" label="Senha atual" error="{{ fieldError .Errors "atual" }}" autocomplete="current-password" required="required" />
+      <.password name="nova" label="Senha nova" error="{{ fieldError .Errors "nova" }}" autocomplete="new-password" required="required" />
+      <.password name="confirmar" label="Confirmar a senha nova" error="{{ fieldError .Errors "confirmar" }}" autocomplete="new-password" required="required" />
+      <.button type="submit">Salvar a senha nova</.button>
+    </.form>
+    <p class="mt-3 text-[11px] leading-4 text-secondary">Mínimo de 8 caracteres. A senha atual é só para confirmar que é você.</p>
+  </div>
+</div>
+{{ end }}

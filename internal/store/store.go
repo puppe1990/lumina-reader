@@ -19,8 +19,12 @@ import (
 
 var ErrEmailTaken = errors.New("email already registered")
 
+var ErrUserNotFound = errors.New("usuário não encontrado")
+
 type Store interface {
 	FindUserByEmail(email string) (models.User, error)
+	GetUser(id int64) (models.User, error)
+	UpdateUserPassword(userID int64, passwordHash string) error
 	CreateUser(email, passwordHash string) (int64, error)
 	CreatePasswordResetToken(userID int64) (string, error)
 	ClearPasswordResetTokens(userID int64) error
@@ -131,6 +135,33 @@ func (s *SQLiteStore) FindUserByEmail(email string) (models.User, error) {
 		return models.User{}, fmt.Errorf("find user: %w", err)
 	}
 	return u, nil
+}
+
+func (s *SQLiteStore) GetUser(id int64) (models.User, error) {
+	var u models.User
+	err := s.db.QueryRow(
+		"SELECT id, email, password_hash, created_at FROM users WHERE id = ?",
+		id,
+	).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return models.User{}, ErrUserNotFound
+	}
+	if err != nil {
+		return models.User{}, fmt.Errorf("get user %d: %w", id, err)
+	}
+	return u, nil
+}
+
+// UpdateUserPassword troca o hash da senha do usuário logado.
+func (s *SQLiteStore) UpdateUserPassword(userID int64, passwordHash string) error {
+	resultado, err := s.db.Exec("UPDATE users SET password_hash = ? WHERE id = ?", passwordHash, userID)
+	if err != nil {
+		return fmt.Errorf("trocar senha do usuário %d: %w", userID, err)
+	}
+	if linhas, err := resultado.RowsAffected(); err == nil && linhas == 0 {
+		return ErrUserNotFound
+	}
+	return nil
 }
 
 func (s *SQLiteStore) CreateUser(email, passwordHash string) (int64, error) {

@@ -20,6 +20,7 @@ func registerRoutes(r *cais.Router, deps Deps, cfg cais.Config) {
 	busca := handlers.NewSearchHandler(deps.Views, deps.Site, deps.Catalog, cfg, deps.Store)
 	sincronizar := handlers.NewSyncHandler(deps.Views, deps.Site, deps.Catalog, cfg, deps.Store, deps.Sincronizador)
 	chat := handlers.NewChatHandler(deps.Store, cfg, deps.ChatConversador, deps.Leitor)
+	perfil := handlers.NewProfileHandler(deps.Views, deps.Store, deps.Site, cfg, deps.Catalog)
 	naoEncontrado := handlers.NewNotFoundHandler(deps.Views, deps.Site, deps.Catalog, cfg)
 	auth := handlers.NewAuthHandler(deps.Views, deps.Store, deps.Site, deps.Store.Sessions(), cfg, deps.Catalog)
 
@@ -31,6 +32,8 @@ func registerRoutes(r *cais.Router, deps Deps, cfg cais.Config) {
 	r.Get("/login", auth.Login)
 	r.Post("/login", loginLimit.Middleware(http.HandlerFunc(auth.LoginPost)).ServeHTTP)
 	r.Post("/logout", auth.LogoutPost)
+	r.Get("/perfil", exigir(perfil.Page))
+	r.Post("/perfil/senha", exigir(perfil.ChangePassword))
 	r.Post("/locale", handlers.PostLocale(cfg))
 
 	r.Get("/", exigir(library.ServeHTTP))
